@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 function App() {
-  const { data: authUser ,isLoading} = useQuery({
+  const { data: authUser, isLoading } = useQuery({
     queryKey : ["authUser"],
     queryFn: async() => {
       try {
@@ -32,9 +32,10 @@ function App() {
       }
     },
     retry: false,
+    staleTime: Infinity,
   });
 
-  if(isLoading){
+if(isLoading){
     return(
       <div className='h-screen flex justify-center items-center'>
         <LoadingSpinner size='lg' />
