@@ -84,7 +84,13 @@ export const commentOnPost = async (req, res) => {
 
         post.comments.push(comment);
         await post.save();
-        res.status(200).json({ message: "Comment added successfully", comment });
+
+        const updatedPost = await Post.findById(postId).populate({
+            path: "comments.user",
+            select: "-password"
+        });
+
+        res.status(200).json(updatedPost.comments);
     } catch (error) {
         console.log("Error in commentOnPost controller:", error);
         res.status(500).json({ message: "Internal server error" }); 
@@ -138,6 +144,9 @@ export const getAllPosts = async (req, res) => {
     try {
         const posts = await Post.find().sort({ createdAt: -1 }).populate({
             path: "user",
+            select: "-password"
+        }).populate({
+            path: "comments.user",
             select: "-password"
         });
 
