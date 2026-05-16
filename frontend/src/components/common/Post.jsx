@@ -15,8 +15,7 @@ import { formatPostDate } from "../../utils/db/date/index";
 const Post = ({ post }) => {
 	const [comment, setComment] = useState("");
 	const {data: authUser} = useQuery({queryKey: ["authUser"], queryFn: () => null, enabled: false});
-	const queryClient = useQueryClient();
-	const postOwner = post.user;
+	const queryClient = useQueryClient();const postOwner = post.user;
 	const isLiked = post.likes.includes(authUser._id);
 
 	const isMyPost = authUser._id === postOwner._id;
@@ -68,6 +67,7 @@ const Post = ({ post }) => {
 					return p;
 				});
 			});
+			queryClient.invalidateQueries({queryKey: ["notifications"]});
 		},
 		onError: (error) => {
 			toast.error(error.message || "Failed to like post");
