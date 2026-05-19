@@ -20,6 +20,7 @@ const useFollow = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: ["suggestedUsers"]});
             queryClient.invalidateQueries({queryKey: ["notifications"]});
+            queryClient.invalidateQueries({queryKey: ["userProfile"]});
         },
         onError: (error) => {
             toast.error(error.message || "Failed to follow user");

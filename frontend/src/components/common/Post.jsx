@@ -16,9 +16,9 @@ const Post = ({ post }) => {
 	const [comment, setComment] = useState("");
 	const {data: authUser} = useQuery({queryKey: ["authUser"], queryFn: () => null, enabled: false});
 	const queryClient = useQueryClient();const postOwner = post.user;
-	const isLiked = post.likes.includes(authUser._id);
+	const isLiked = authUser ? post.likes.includes(authUser._id) : false;
 
-	const isMyPost = authUser._id === postOwner._id;
+	const isMyPost = authUser?._id === postOwner?._id;
 
 	const formattedDate = formatPostDate(post.createdAt);
 
