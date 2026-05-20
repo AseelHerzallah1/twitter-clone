@@ -5,11 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Twitter Clone</title>
+    <script>
+      const theme = localStorage.getItem("theme") || "black";
+      document.documentElement.setAttribute("data-theme", theme);
+    </script>
   </head>
-  <script>
-    const theme = localStorage.getItem("theme") || "black";
-    document.documentElement.setAttribute("data-theme", theme);
-  </script>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

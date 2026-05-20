@@ -36,7 +36,6 @@ const Post = ({ post }) => {
 			}
 		},
 		onSuccess: () => {
-			toast.success("Post deleted successfully");
 			// invalidate the query to refetch the posts (data)
 			queryClient.invalidateQueries({queryKey: ["posts"]});
 		}
