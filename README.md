@@ -1,4 +1,5 @@
 # 🐦 Twitter Clone
+A full-stack Twitter clone built with the MERN stack, featuring authentication, social interactions, and cloud-based media handling.
 
 I've always preferred the old Twitter — the bird, the tweets, the retweets, the simplicity. When X took over and changed everything, I figured the best way to keep that nostalgia alive was to build it myself.
 
