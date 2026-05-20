@@ -13,10 +13,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 
 const Sidebar = () => {
-	const [theme, setTheme] = useState("black");
+	const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "black");
 
 	useEffect(() => {
 		document.documentElement.setAttribute("data-theme", theme);
+		localStorage.setItem("theme", theme);
 	}, [theme]);
 
 	const toggleTheme = () => setTheme(theme === "black" ? "light" : "black");
