@@ -24,7 +24,7 @@ const CreatePost = () => {
 					body: JSON.stringify({text, img})
 				});
 				const data = await res.json();
-				if(!res.ok) throw new Error(data.message || "Failed to create post");
+				if(!res.ok) throw new Error(data.error || "Failed to create post");
 				return data;
 			} catch (error) {
 				throw new Error(error);
