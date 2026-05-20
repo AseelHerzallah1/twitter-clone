@@ -12,7 +12,7 @@ const RightPanel = () => {
 			try {
 				const res = await fetch("/api/users/suggested");
 				const data = await res.json();
-				if(!res.ok) throw new Error(data.message || "Failed to fetch suggested users");
+				if(!res.ok) throw new Error(data.error || "Failed to fetch suggested users");
 				return data.suggestedUsers;
 			} catch (error) {
 				throw new Error(error);
@@ -26,7 +26,7 @@ const RightPanel = () => {
 
 	return (
 		<div className='hidden lg:block my-4 mx-2'>
-			<div className='bg-[#16181C] p-4 rounded-md sticky top-2'>
+			<div className='bg-base-200 p-4 rounded-md sticky top-2'>
 				<p className='font-bold'>Who to follow</p>
 				<div className='flex flex-col gap-4'>
 					{/* item */}

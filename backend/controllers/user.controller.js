@@ -1,4 +1,5 @@
 import User from "../models/user.model.js";
+import Post from "../models/post.model.js";
 import Notification from "../models/notification.model.js";
 import bcrypt from "bcryptjs";
 import { v2 as cloudinary } from "cloudinary"; 
@@ -9,9 +10,9 @@ export const getUserProfile = async (req, res) => {
         const user = await User.findOne({ username }).select("-password -email -__v");
         if (!user) {
             return res.status(404).json({ message: "User not found" });
-        } else {
-            return res.status(200).json({ user });
         }
+        const tweetsCount = await Post.countDocuments({ user: user._id });
+        return res.status(200).json({ user: { ...user.toObject(), tweetsCount } });
     } catch (error) {
         console.error("Error fetching user profile:", error);
         return res.status(500).json({ message: "Server error" });
@@ -139,5 +140,26 @@ export const updateUser = async (req, res) => {
     } catch (error) {
         console.error("Error updating user:", error);
         return res.status(500).json({ message: "Server error" });
+    }
+};
+export const getFollowers = async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username })
+            .populate({ path: "followers", select: "-password -email" });
+        if (!user) return res.status(404).json({ message: "User not found" });
+        res.status(200).json({ users: user.followers });
+    } catch (error) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+export const getFollowing = async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username })
+            .populate({ path: "following", select: "-password -email" });
+        if (!user) return res.status(404).json({ message: "User not found" });
+        res.status(200).json({ users: user.following });
+    } catch (error) {
+        res.status(500).json({ message: "Server error" });
     }
 };

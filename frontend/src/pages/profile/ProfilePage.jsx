@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import Posts from "../../components/common/Posts";
 import ProfileHeaderSkeleton from "../../components/skeletons/ProfileHeaderSkeleton";
+import FollowListModal from "../../components/common/FollowListModal";
 import EditProfileModal from "./EditProfileModal";
 
 import { POSTS } from "../../utils/db/dummy";
@@ -22,6 +23,7 @@ const ProfilePage = () => {
 	const [coverImg, setCoverImg] = useState(null);
 	const [profileImg, setProfileImg] = useState(null);
 	const [feedType, setFeedType] = useState("posts");
+	const [followModal, setFollowModal] = useState(null); // "followers" | "following" | null
 
 	const coverImgRef = useRef(null);
 	const profileImgRef = useRef(null);
@@ -87,7 +89,7 @@ const ProfilePage = () => {
 								</Link>
 								<div className='flex flex-col'>
 									<p className='font-bold text-lg'>{user?.fullName}</p>
-									<span className='text-sm text-slate-500'>{POSTS?.length} posts</span>
+									<span className='text-sm text-slate-500'>{user?.tweetsCount} tweets</span>
 								</div>
 							</div>
 							{/* COVER IMG */}
@@ -188,11 +190,11 @@ const ProfilePage = () => {
 									</div>
 								</div>
 								<div className='flex gap-2'>
-									<div className='flex gap-1 items-center'>
+									<div className='flex gap-1 items-center cursor-pointer hover:underline' onClick={() => setFollowModal("following")}>
 										<span className='font-bold text-xs'>{user?.following.length}</span>
 										<span className='text-slate-500 text-xs'>Following</span>
 									</div>
-									<div className='flex gap-1 items-center'>
+									<div className='flex gap-1 items-center cursor-pointer hover:underline' onClick={() => setFollowModal("followers")}>
 										<span className='font-bold text-xs'>{user?.followers.length}</span>
 										<span className='text-slate-500 text-xs'>Followers</span>
 									</div>
@@ -203,7 +205,7 @@ const ProfilePage = () => {
 									className='flex justify-center flex-1 p-3 hover:bg-secondary transition duration-300 relative cursor-pointer'
 									onClick={() => setFeedType("posts")}
 								>
-									Posts
+									Tweets
 									{feedType === "posts" && (
 										<div className='absolute bottom-0 w-10 h-1 rounded-full bg-primary' />
 									)}
@@ -224,6 +226,13 @@ const ProfilePage = () => {
 					{user && <Posts feedType={feedType} username={user?.username} userId={user?._id}/>}
 				</div>
 			</div>
+			{followModal && (
+				<FollowListModal
+					username={username}
+					type={followModal}
+					onClose={() => setFollowModal(null)}
+				/>
+			)}
 		</>
 	);
 };

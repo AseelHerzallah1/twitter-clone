@@ -108,6 +108,34 @@ const Post = ({ post }) => {
 		},
 	});
 
+	const {mutate: retweetPost, isPending: isRetweeting} = useMutation({
+		mutationFn: async () => {
+			try {
+				const res = await fetch(`/api/posts/retweet/${post._id}`, { method: "POST" });
+				const data = await res.json();
+				if (!res.ok) throw new Error(data.error || "Failed to retweet");
+				return data;
+			} catch (error) {
+				throw new Error(error);
+			}
+		},
+		onSuccess: (updatedRetweets) => {
+			queryClient.setQueriesData({queryKey: ["posts"]}, (oldData) => {
+				if (!oldData) return oldData;
+				return oldData.map((p) => {
+					if (p._id === post._id) return {...p, retweets: updatedRetweets};
+					return p;
+				});
+			});
+			queryClient.invalidateQueries({queryKey: ["notifications"]});
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to retweet");
+		},
+	});
+
+	const hasRetweeted = post.retweets?.some(r => r.user?.toString() === authUser?._id?.toString() || r.toString() === authUser?._id?.toString());
+
 	const handleDeletePost = () => {
 		deletePost();
 	};
@@ -125,10 +153,16 @@ const Post = ({ post }) => {
 
 	return (
 		<>
+			{hasRetweeted && (
+				<div className='flex items-center gap-1 px-4 pt-2 text-slate-500 text-sm'>
+					<BiRepost className='w-4 h-4' />
+					<span>You retweeted</span>
+				</div>
+			)}
 			<div className='flex gap-2 items-start p-4 border-b border-gray-700'>
 				<div className='avatar'>
 					<Link to={`/profile/${postOwner.username}`} className='w-8 rounded-full overflow-hidden'>
-						<img src={postOwner.profileImg || "/avatar-placeholder.png"} />
+						<img src={postOwner.profileImage || "/avatar-placeholder.png"} />
 					</Link>
 				</div>
 				<div className='flex flex-col flex-1'>
@@ -188,7 +222,7 @@ const Post = ({ post }) => {
 												<div className='avatar'>
 													<div className='w-8 rounded-full'>
 														<img
-															src={comment.user.profileImg || "/avatar-placeholder.png"}
+															src={comment.user.profileImage || "/avatar-placeholder.png"}
 														/>
 													</div>
 												</div>
@@ -215,7 +249,7 @@ const Post = ({ post }) => {
 											onChange={(e) => setComment(e.target.value)}
 										/>
 										<button className='btn btn-primary rounded-full btn-sm text-white px-4'>
-											{isCommenting ?<LoadingSpinner size = "md" /> : "Post"}
+											{isCommenting ?<LoadingSpinner size = "md" /> : "Reply"}
 										</button>
 									</form>
 								</div>
@@ -223,9 +257,12 @@ const Post = ({ post }) => {
 									<button className='outline-none'>close</button>
 								</form>
 							</dialog>
-							<div className='flex gap-1 items-center group cursor-pointer'>
-								<BiRepost className='w-6 h-6  text-slate-500 group-hover:text-green-500' />
-								<span className='text-sm text-slate-500 group-hover:text-green-500'>0</span>
+							<div className='flex gap-1 items-center group cursor-pointer' onClick={() => !isRetweeting && retweetPost()}>
+								{isRetweeting && <LoadingSpinner size='sm' />}
+								{!isRetweeting && <BiRepost className={`w-6 h-6 group-hover:text-green-500 ${hasRetweeted ? "text-green-500" : "text-slate-500"}`} />}
+								<span className={`text-sm group-hover:text-green-500 ${hasRetweeted ? "text-green-500" : "text-slate-500"}`}>
+									{post.retweets?.length}
+								</span>
 							</div>
 							<div className='flex gap-1 items-center group cursor-pointer' onClick={handleLikePost}>
 								{isLiking && <LoadingSpinner size = "sm"/>}

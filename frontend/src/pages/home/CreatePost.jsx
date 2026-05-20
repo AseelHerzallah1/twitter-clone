@@ -59,13 +59,13 @@ const CreatePost = () => {
 		<div className='flex p-4 items-start gap-4 border-b border-gray-700'>
 			<div className='avatar'>
 				<div className='w-8 rounded-full'>
-					<img src={authUser.profileImg || "/avatar-placeholder.png"} />
+					<img src={authUser.profileImage || "/avatar-placeholder.png"} />
 				</div>
 			</div>
 			<form className='flex flex-col gap-2 w-full' onSubmit={handleSubmit}>
 				<textarea
 					className='textarea w-full p-0 text-lg resize-none border-none focus:outline-none  border-gray-800'
-					placeholder='What is happening?!'
+					placeholder="What's on your mind?"
 					value={text}
 					onChange={(e) => setText(e.target.value)}
 				/>
@@ -92,7 +92,7 @@ const CreatePost = () => {
 					</div>
 					<input type='file'accept='image/*' hidden ref={imgRef} onChange={handleImgChange} />
 					<button className='btn btn-primary rounded-full btn-sm text-white px-4'>
-						{isPending ? "Posting..." : "Post"}
+						{isPending ? "Tweeting..." : "Tweet"}
 					</button>
 				</div>
 				{isError && <div className='text-red-500'>{error.message}</div>}

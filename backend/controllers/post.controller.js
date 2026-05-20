@@ -198,13 +198,27 @@ export const getFollowingPosts = async (req, res) => {
         
         const following = user.following;
 
-        const followingPosts = await Post.find({ user: { $in: following } }).sort({ createdAt: -1 }).populate({
+        const followingPosts = await Post.find({
+            $or: [
+                { user: { $in: following } },
+                { "retweets.user": { $in: following } }
+            ]
+        }).populate({
             path: "user",
             select: "-password"
         }).populate({
             path : "comments.user",
             select: "-password"
+        }).lean();
+
+        followingPosts.sort((a, b) => {
+            const aRetweet = a.retweets?.find(r => following.some(f => f.toString() === r.user.toString()));
+            const bRetweet = b.retweets?.find(r => following.some(f => f.toString() === r.user.toString()));
+            const aTime = aRetweet?.createdAt || a.createdAt;
+            const bTime = bRetweet?.createdAt || b.createdAt;
+            return new Date(bTime) - new Date(aTime);
         });
+
         res.status(200).json({ followingPosts });
     } catch (error) {
         console.log("Error in getFollowingPosts controller:", error);
@@ -222,17 +236,62 @@ export const getUserPosts = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const userPosts = await Post.find({ user: user._id }).sort({ createdAt: -1 }).populate({
-            path: "user",
-            select: "-password"
-        }).populate({
-            path : "comments.user",
-            select: "-password"
+        const userPosts = await Post.find({
+            $or: [{ user: user._id }, { "retweets.user": user._id }]
+        }).populate({ path: "user", select: "-password" })
+          .populate({ path: "comments.user", select: "-password" })
+          .lean();
+
+        // sort: if retweeted by this user, use retweet time; else use post creation time
+        userPosts.sort((a, b) => {
+            const aTime = a.retweets?.find(r => r.user.toString() === user._id.toString())?.createdAt || a.createdAt;
+            const bTime = b.retweets?.find(r => r.user.toString() === user._id.toString())?.createdAt || b.createdAt;
+            return new Date(bTime) - new Date(aTime);
         });
 
         res.status(200).json({ userPosts });
     } catch (error) {
         console.log("Error in getUserPosts controller:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const retweetPost = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const postId = req.params.id;
+
+        const post = await Post.findById(postId);
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        const hasRetweeted = post.retweets.some(r => {
+            const retweetUserId = r.user ? r.user.toString() : r.toString();
+            return retweetUserId === userId.toString();
+        });
+
+        if (hasRetweeted) {
+            await post.updateOne({ $pull: { retweets: { user: userId } } });
+            await Post.updateOne({ _id: postId }, { $pull: { retweets: userId } });
+            await Notification.deleteOne({ from: userId, to: post.user, type: "retweet" });
+            const updatedPost = await Post.findById(postId);
+            return res.status(200).json(updatedPost.retweets);
+        } else {
+            post.retweets.push({ user: userId, createdAt: new Date() });
+            await post.save();
+
+            if (userId.toString() !== post.user.toString()) {
+                const notification = new Notification({
+                    from: userId,
+                    to: post.user,
+                    type: "retweet"
+                });
+                await notification.save();
+            }
+
+            return res.status(200).json(post.retweets);
+        }
+    } catch (error) {
+        console.log("Error in retweetPost controller:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 }
