@@ -1,14 +1,14 @@
 {
   "name": "twitter_clone",
   "version": "1.0.0",
-  "description": "",
+  "description": "Classic Twitter clone (MERN): timelines, reposts, DMs, Nest AI, profiles — deployed on Vercel + Render with JWT auth and Cloudinary.",
   "main": "backend/server.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon backend/server.js",
     "start": "cross-env NODE_ENV=production node backend/server.js",
     "build": "npm install && npm install --prefix frontend --include=dev && npm run build --prefix frontend"
   },
-  "keywords": [],
+  "keywords": ["twitter-clone", "mern", "react", "mongodb", "portfolio", "social-media"],
   "author": "",
   "type": "module",
   "license": "ISC",
