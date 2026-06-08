@@ -88,6 +88,10 @@ const NestPanel = () => {
 	}, [open]);
 
 	useEffect(() => {
+		window.dispatchEvent(new CustomEvent("nest-panel-change", { detail: { open } }));
+	}, [open]);
+
+	useEffect(() => {
 		if (!menuOpen) return;
 		const handleClick = (e) => {
 			if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);

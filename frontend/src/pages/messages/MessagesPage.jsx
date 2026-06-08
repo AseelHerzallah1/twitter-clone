@@ -8,11 +8,8 @@ import LoadingSpinner from "../../components/common/LoadingSpinner";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { formatPostDate } from "../../utils/db/date/index";
 
-const ConversationView = ({ conversationId, onBack, onDeleted }) => {
+const ConversationView = ({ conversationId, onBack }) => {
 	const [text, setText] = useState("");
-	const [menuOpen, setMenuOpen] = useState(false);
-	const [confirmDelete, setConfirmDelete] = useState(false);
-	const menuRef = useRef(null);
 	const queryClient = useQueryClient();
 	const { data: authUser } = useQuery({ queryKey: ["authUser"], queryFn: () => null, enabled: false });
 
@@ -33,15 +30,6 @@ const ConversationView = ({ conversationId, onBack, onDeleted }) => {
 		queryClient.invalidateQueries({ queryKey: ["dmUnreadCount"] });
 	};
 
-	useEffect(() => {
-		if (!menuOpen) return;
-		const handleClickOutside = (e) => {
-			if (!menuRef.current?.contains(e.target)) setMenuOpen(false);
-		};
-		document.addEventListener("mousedown", handleClickOutside);
-		return () => document.removeEventListener("mousedown", handleClickOutside);
-	}, [menuOpen]);
-
 	const { mutate: send, isPending } = useMutation({
 		mutationFn: async (messageText) => {
 			const res = await fetch(`/api/messages/${conversationId}`, {
@@ -57,21 +45,6 @@ const ConversationView = ({ conversationId, onBack, onDeleted }) => {
 			setText("");
 			invalidateMessageQueries();
 		},
-	});
-
-	const { mutate: deleteConversation } = useMutation({
-		mutationFn: async () => {
-			const res = await fetch(`/api/messages/${conversationId}`, { method: "DELETE" });
-			const json = await res.json();
-			if (!res.ok) throw new Error(json.message);
-			return json;
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["conversations"] });
-			queryClient.invalidateQueries({ queryKey: ["dmUnreadCount"] });
-			onDeleted?.();
-		},
-		onError: (error) => toast.error(error.message),
 	});
 
 	const handleSubmit = (e) => {
@@ -99,33 +72,6 @@ const ConversationView = ({ conversationId, onBack, onDeleted }) => {
 					<img src={otherUser?.profileImage || "/avatar-placeholder.svg"} alt='' className='w-8 h-8 rounded-full' />
 					<span className='font-bold truncate'>{otherUser?.fullName}</span>
 				</Link>
-				<span className='relative' ref={menuRef}>
-					<button
-						type='button'
-						onClick={() => setMenuOpen((open) => !open)}
-						className={`p-2 rounded-full transition-colors ${
-							menuOpen ? "bg-base-200 text-base-content" : "hover-bg-theme text-muted-theme"
-						}`}
-						aria-label='Conversation options'
-						aria-expanded={menuOpen}
-					>
-						<HiOutlineDotsHorizontal className='w-5 h-5' />
-					</button>
-					{menuOpen && (
-						<div className='absolute top-full right-0 mt-1 w-52 bg-base-100 border border-theme rounded-xl shadow-lg overflow-hidden z-20'>
-							<button
-								type='button'
-								className='w-full px-4 py-3 text-left text-[15px] font-bold text-red-500 hover:bg-red-500/10 transition-colors'
-								onClick={() => {
-									setMenuOpen(false);
-									setConfirmDelete(true);
-								}}
-							>
-								Delete conversation
-							</button>
-						</div>
-					)}
-				</span>
 			</div>
 
 			<div className='flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3'>
@@ -165,19 +111,82 @@ const ConversationView = ({ conversationId, onBack, onDeleted }) => {
 					<FaPaperPlane className='w-3.5 h-3.5' />
 				</button>
 			</form>
+		</div>
+	);
+};
 
-			{confirmDelete && (
-				<ConfirmDialog
-					title='Delete conversation?'
-					message='This will permanently delete this entire conversation and all messages in it.'
-					confirmLabel='Delete'
-					onConfirm={() => {
-						deleteConversation();
-						setConfirmDelete(false);
-					}}
-					onCancel={() => setConfirmDelete(false)}
+const ConversationListItem = ({ convo, isActive, onSelect, onDeleteRequest, menuOpen, onMenuToggle }) => {
+	const menuRef = useRef(null);
+
+	useEffect(() => {
+		if (!menuOpen) return;
+		const handleClickOutside = (e) => {
+			if (!menuRef.current?.contains(e.target)) onMenuToggle(null);
+		};
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, [menuOpen, onMenuToggle]);
+
+	return (
+		<div
+			className={`relative flex items-center gap-2 px-4 py-3 border-b border-theme transition-colors ${
+				isActive ? "bg-base-200" : "hover-bg-theme"
+			}`}
+		>
+			<button
+				type='button'
+				onClick={() => onSelect(convo._id)}
+				className='flex gap-3 flex-1 min-w-0 text-left'
+			>
+				<img
+					src={convo.otherUser?.profileImage || "/avatar-placeholder.svg"}
+					alt=''
+					className='w-12 h-12 rounded-full shrink-0'
 				/>
-			)}
+				<div className='min-w-0 flex-1'>
+					<div className='flex justify-between gap-2'>
+						<p className='font-bold truncate'>{convo.otherUser?.fullName}</p>
+						<span className='text-xs text-muted-theme shrink-0'>
+							{formatPostDate(convo.lastMessageAt)}
+						</span>
+					</div>
+					{convo.lastMessage && (
+						<p className='text-sm text-muted-theme truncate mt-0.5'>{convo.lastMessage}</p>
+					)}
+				</div>
+			</button>
+
+			<span className='relative shrink-0' ref={menuRef}>
+				<button
+					type='button'
+					onClick={(e) => {
+						e.stopPropagation();
+						onMenuToggle(menuOpen ? null : convo._id);
+					}}
+					className={`p-1.5 rounded-full transition-colors ${
+						menuOpen ? "bg-base-300 text-base-content" : "hover-bg-theme text-muted-theme"
+					}`}
+					aria-label='Conversation options'
+					aria-expanded={menuOpen}
+				>
+					<HiOutlineDotsHorizontal className='w-5 h-5' />
+				</button>
+				{menuOpen && (
+					<div className='absolute top-full right-0 mt-1 w-52 bg-base-100 border border-theme rounded-xl shadow-lg overflow-hidden z-30'>
+						<button
+							type='button'
+							className='w-full px-4 py-3 text-left text-[15px] font-bold text-red-500 hover:bg-red-500/10 transition-colors'
+							onClick={(e) => {
+								e.stopPropagation();
+								onMenuToggle(null);
+								onDeleteRequest(convo._id);
+							}}
+						>
+							Delete conversation
+						</button>
+					</div>
+				)}
+			</span>
 		</div>
 	);
 };
@@ -185,6 +194,9 @@ const ConversationView = ({ conversationId, onBack, onDeleted }) => {
 const MessagesPage = () => {
 	const [params] = useSearchParams();
 	const [activeId, setActiveId] = useState(params.get("c"));
+	const [openMenuId, setOpenMenuId] = useState(null);
+	const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+	const queryClient = useQueryClient();
 
 	useEffect(() => {
 		const c = params.get("c");
@@ -200,6 +212,22 @@ const MessagesPage = () => {
 			return json.conversations || [];
 		},
 		refetchInterval: 10000,
+	});
+
+	const { mutate: deleteConversation } = useMutation({
+		mutationFn: async (conversationId) => {
+			const res = await fetch(`/api/messages/${conversationId}`, { method: "DELETE" });
+			const json = await res.json();
+			if (!res.ok) throw new Error(json.message);
+			return json;
+		},
+		onSuccess: (_, conversationId) => {
+			queryClient.invalidateQueries({ queryKey: ["conversations"] });
+			queryClient.invalidateQueries({ queryKey: ["dmUnreadCount"] });
+			if (activeId === conversationId) setActiveId(null);
+			setConfirmDeleteId(null);
+		},
+		onError: (error) => toast.error(error.message),
 	});
 
 	return (
@@ -219,48 +247,37 @@ const MessagesPage = () => {
 					</p>
 				)}
 				{conversations.map((convo) => (
-					<button
+					<ConversationListItem
 						key={convo._id}
-						type='button'
-						onClick={() => setActiveId(convo._id)}
-						className={`w-full flex gap-3 px-4 py-3 hover-bg-theme transition-colors text-left border-b border-theme ${
-							activeId === convo._id ? "bg-base-200" : ""
-						}`}
-					>
-						<img
-							src={convo.otherUser?.profileImage || "/avatar-placeholder.svg"}
-							alt=''
-							className='w-12 h-12 rounded-full shrink-0'
-						/>
-						<div className='min-w-0 flex-1'>
-							<div className='flex justify-between gap-2'>
-								<p className='font-bold truncate'>{convo.otherUser?.fullName}</p>
-								<span className='text-xs text-muted-theme shrink-0'>
-									{formatPostDate(convo.lastMessageAt)}
-								</span>
-							</div>
-							<p className='text-sm text-muted-theme truncate'>@{convo.otherUser?.username}</p>
-							{convo.lastMessage && (
-								<p className='text-sm text-muted-theme truncate mt-0.5'>{convo.lastMessage}</p>
-							)}
-						</div>
-					</button>
+						convo={convo}
+						isActive={activeId === convo._id}
+						onSelect={setActiveId}
+						onDeleteRequest={setConfirmDeleteId}
+						menuOpen={openMenuId === convo._id}
+						onMenuToggle={setOpenMenuId}
+					/>
 				))}
 			</div>
 
 			<div className={`flex-1 ${!activeId ? "hidden lg:flex" : "flex"} items-center justify-center`}>
 				{activeId ? (
 					<div className='w-full h-full'>
-						<ConversationView
-							conversationId={activeId}
-							onBack={() => setActiveId(null)}
-							onDeleted={() => setActiveId(null)}
-						/>
+						<ConversationView conversationId={activeId} onBack={() => setActiveId(null)} />
 					</div>
 				) : (
 					<p className='text-muted-theme hidden lg:block'>Select a message</p>
 				)}
 			</div>
+
+			{confirmDeleteId && (
+				<ConfirmDialog
+					title='Delete conversation?'
+					message='This will permanently delete this entire conversation and all messages in it.'
+					confirmLabel='Delete'
+					onConfirm={() => deleteConversation(confirmDeleteId)}
+					onCancel={() => setConfirmDeleteId(null)}
+				/>
+			)}
 		</div>
 	);
 };

@@ -30,8 +30,11 @@ const headerIconClass = (isActive) =>
 		isActive ? "text-primary" : "text-base-content hover-bg-theme"
 	}`;
 
+const HIDE_SEARCH_ON = ["/messages", "/notifications", "/bookmarks"];
+
 const MobileNav = () => {
 	const [open, setOpen] = useState(false);
+	const [nestOpen, setNestOpen] = useState(false);
 	const location = useLocation();
 	const handleCompose = useOpenCompose();
 
@@ -48,7 +51,17 @@ const MobileNav = () => {
 		return () => { document.body.style.overflow = ""; };
 	}, [open]);
 
-	const showMobileSearch = location.pathname !== "/search";
+	useEffect(() => {
+		const onNestChange = (e) => setNestOpen(Boolean(e.detail?.open));
+		window.addEventListener("nest-panel-change", onNestChange);
+		return () => window.removeEventListener("nest-panel-change", onNestChange);
+	}, []);
+
+	const showMobileSearch =
+		location.pathname !== "/search" &&
+		!HIDE_SEARCH_ON.includes(location.pathname) &&
+		!location.pathname.startsWith("/post/") &&
+		!nestOpen;
 
 	useEffect(() => {
 		const offset = showMobileSearch
