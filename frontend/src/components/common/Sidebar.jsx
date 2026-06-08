@@ -12,6 +12,7 @@ import { IoSettingsOutline } from "react-icons/io5";
 import { useQuery } from "@tanstack/react-query";
 import ProfileAccountMenu from "./ProfileAccountMenu";
 import { openSettings } from "../../utils/openSettings";
+import { openCompose } from "../../utils/openCompose";
 
 const navLinkClass = ({ isActive }) =>
 	`flex gap-4 items-center transition-all rounded-full duration-300 py-3 px-4 max-w-fit cursor-pointer ${
@@ -25,11 +26,11 @@ const Sidebar = () => {
 
 	return (
 		<aside className='hidden lg:flex shrink-0 w-[275px]'>
-			<div className='sticky top-0 h-screen flex flex-col border-r border-theme w-full px-3 bg-base-100'>
-				<NavLink to='/' className='flex justify-start mt-1'>
+			<div className='sticky top-0 h-screen flex flex-col border-r border-theme w-full px-3 bg-base-100 min-h-0'>
+				<NavLink to='/' className='flex justify-start mt-1 shrink-0'>
 					<TwitterBird className='p-2 w-12 h-12 rounded-full hover-bg-theme fill-primary' />
 				</NavLink>
-				<ul className='flex flex-col gap-1 mt-2'>
+				<ul className='flex flex-col gap-1 mt-2 flex-1 min-h-0 overflow-y-auto scrollbar-hide'>
 					<li>
 						<NavLink to='/' end className={navLinkClass}>
 							{({ isActive }) => (
@@ -56,9 +57,9 @@ const Sidebar = () => {
 						<NavLink to='/messages' className={navLinkClass}>
 							{({ isActive }) => (
 								<>
-									<span className='relative'>
+									<span className='relative inline-flex w-7 h-7 items-center justify-center shrink-0'>
 										{isActive ? <IoMail className='w-6 h-6' /> : <IoMailOutline className='w-6 h-6' />}
-										<NavBadge count={dmCount} />
+										<NavBadge count={dmCount} sidebar />
 									</span>
 									<span className='text-xl'>Messages</span>
 								</>
@@ -79,9 +80,9 @@ const Sidebar = () => {
 						<NavLink to='/notifications' className={navLinkClass}>
 							{({ isActive }) => (
 								<>
-									<span className='relative'>
-										{isActive ? <IoNotifications className='w-7 h-7' /> : <IoNotificationsOutline className='w-7 h-7' />}
-										<NavBadge count={notifCount} />
+									<span className='relative inline-flex w-7 h-7 items-center justify-center shrink-0'>
+										{isActive ? <IoNotifications className='w-6 h-6' /> : <IoNotificationsOutline className='w-6 h-6' />}
+										<NavBadge count={notifCount} sidebar />
 									</span>
 									<span className='text-xl'>Notifications</span>
 								</>
@@ -95,7 +96,14 @@ const Sidebar = () => {
 						</NavLink>
 					</li>
 				</ul>
-				<div className='mt-2'>
+				<div className='shrink-0 pt-2 pb-3 space-y-2'>
+					<button
+						type='button'
+						onClick={openCompose}
+						className='btn btn-primary rounded-full text-white font-bold text-[17px] h-12 min-h-12 w-[90%] max-w-[220px] ml-1'
+					>
+						Tweet
+					</button>
 					<button
 						type='button'
 						onClick={openSettings}
@@ -104,13 +112,13 @@ const Sidebar = () => {
 						<IoSettingsOutline className='w-6 h-6' />
 						<span className='text-xl'>Settings</span>
 					</button>
+					{authUser && (
+						<ProfileAccountMenu
+							authUser={authUser}
+							className='relative hover-bg-theme py-2 px-3 rounded-full transition-colors'
+						/>
+					)}
 				</div>
-				{authUser && (
-					<ProfileAccountMenu
-						authUser={authUser}
-						className='relative mt-auto mb-4 hover-bg-theme py-2 px-3 rounded-full transition-colors'
-					/>
-				)}
 			</div>
 		</aside>
 	);

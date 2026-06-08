@@ -21,7 +21,7 @@ const PostDetailPage = () => {
 		<div className='w-full min-h-screen'>
 			<div className='sticky-page-header bg-base-100/80 backdrop-blur-md flex items-center gap-6 px-4 py-2 border-b border-theme'>
 				<BackButton />
-				<h1 className='text-xl font-bold'>Post</h1>
+				<h1 className='text-xl font-bold'>Tweet</h1>
 			</div>
 
 			{isLoading && (

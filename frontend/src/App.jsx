@@ -18,7 +18,6 @@ import ComposeModal from './components/common/ComposeModal';
 import SettingsModal from './components/common/SettingsModal';
 import { ThemeProvider } from './context/ThemeContext';
 import NestPanel from './components/nest/NestPanel';
-import NestFab from './components/nest/NestFab';
 
 import {Toaster} from "react-hot-toast";
 import { useQuery } from '@tanstack/react-query';
@@ -87,7 +86,6 @@ if(isLoading){
       <ComposeModal />
       <SettingsModal />
       <NestPanel />
-      <NestFab />
       <Toaster />
     </>
   );

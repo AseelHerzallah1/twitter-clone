@@ -166,7 +166,7 @@ const SearchBar = ({ className = "", compact = false, onNavigate, initialQuery =
 
 						{posts.length > 0 && (
 							<div className={users.length > 0 ? "border-t border-theme" : ""}>
-								<p className='px-4 py-2 text-xs font-bold text-muted-theme uppercase tracking-wide'>Posts</p>
+								<p className='px-4 py-2 text-xs font-bold text-muted-theme uppercase tracking-wide'>Tweets</p>
 								{posts.map((post) => (
 									<button
 										key={post._id}

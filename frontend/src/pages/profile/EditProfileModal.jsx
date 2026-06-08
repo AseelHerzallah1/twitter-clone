@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import useUpdateUserProfile from "../../hooks/useUpdateUserProfile";
+import { toDateInputValue } from "../../utils/db/date/index";
 
 const EditProfileModal = ({ authUser }) => {
 	const [open, setOpen] = useState(false);
@@ -10,6 +11,7 @@ const EditProfileModal = ({ authUser }) => {
 		email: "",
 		bio: "",
 		link: "",
+		birthday: "",
 		currentPassword: "",
 		newPassword: "",
 		confirmPassword: "",
@@ -25,6 +27,7 @@ const EditProfileModal = ({ authUser }) => {
 			email: authUser.email || "",
 			bio: authUser.bio || "",
 			link: authUser.link || "",
+			birthday: toDateInputValue(authUser.birthday),
 			currentPassword: "",
 			newPassword: "",
 			confirmPassword: "",
@@ -50,6 +53,7 @@ const EditProfileModal = ({ authUser }) => {
 			email: formData.email,
 			bio: formData.bio,
 			link: formData.link,
+			birthday: formData.birthday || null,
 		};
 
 		if (showPassword) {
@@ -145,6 +149,20 @@ const EditProfileModal = ({ authUser }) => {
 									onChange={handleInputChange}
 									placeholder='https://'
 								/>
+							</div>
+
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Birth date</label>
+								<input
+									type='date'
+									className='w-full input input-bordered rounded-xl'
+									value={formData.birthday}
+									name='birthday'
+									onChange={handleInputChange}
+								/>
+								<p className='text-xs text-muted-theme mt-1'>
+									Shown on your profile as month and day. Clear the date to remove it.
+								</p>
 							</div>
 
 							<div className='border-t border-theme pt-4'>

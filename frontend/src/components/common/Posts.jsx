@@ -42,13 +42,13 @@ const extractItems = (feedType, data) =>
 	[];
 
 const emptyMessage = {
-	forYou: "No posts yet.",
-	following: "No posts from people you follow.",
-	bookmarks: "Save posts for later by tapping the bookmark icon.",
-	likes: "No liked posts yet.",
+	forYou: "No tweets yet.",
+	following: "No tweets from people you follow.",
+	bookmarks: "Save tweets for later by tapping the bookmark icon.",
+	likes: "No liked tweets yet.",
 	replies: "No replies yet.",
 	media: "No media yet.",
-	posts: "No posts yet.",
+	posts: "No tweets yet.",
 };
 
 const fetchPostsPage = async (endpoint, feedType, cursor) => {
@@ -147,7 +147,7 @@ const Posts = ({ feedType, username, userId }) => {
 					<FeedEmptyState feedType={feedType} />
 				) : (
 					<p className='text-center my-8 px-4 text-muted-theme'>
-						{emptyMessage[feedType] || "No posts found."}
+						{emptyMessage[feedType] || "No tweets found."}
 					</p>
 				)
 			)}

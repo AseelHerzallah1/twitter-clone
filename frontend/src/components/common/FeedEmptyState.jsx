@@ -6,11 +6,11 @@ import SuggestedUsers from "./SuggestedUsers";
 const COPY = {
 	forYou: {
 		title: "Welcome to your timeline",
-		body: "When you're ready, share your first post. Or tap a topic below to see what's happening.",
+		body: "When you're ready, send your first tweet. Or tap a topic below to see what's happening.",
 	},
 	following: {
-		title: "See posts from people you follow",
-		body: "Follow a few accounts and their posts will show up here.",
+		title: "See tweets from people you follow",
+		body: "Follow a few accounts and their tweets will show up here.",
 	},
 };
 

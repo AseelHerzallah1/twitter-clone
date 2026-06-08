@@ -7,12 +7,12 @@ import ProfileHeaderSkeleton from "../../components/skeletons/ProfileHeaderSkele
 import FollowListModal from "../../components/common/FollowListModal";
 import EditProfileModal from "./EditProfileModal";
 
-import { IoCalendarOutline } from "react-icons/io5";
+import { IoCalendarOutline, IoGiftOutline, IoMailOutline } from "react-icons/io5";
 import { FaLink } from "react-icons/fa";
 import { MdEdit } from "react-icons/md";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { formatMemberSinceDate } from "../../utils/db/date/index";
+import { formatBirthday, formatMemberSinceDate } from "../../utils/db/date/index";
 import useFollow from "../../hooks/useFollow";
 import useStartConversation from "../../hooks/useStartConversation";
 import useUpdateUserProfile from "../../hooks/useUpdateUserProfile";
@@ -54,6 +54,7 @@ const ProfilePage = () => {
 
 	const isMyProfile = authUser?.username === user?.username;
 	const memberSinceDate = formatMemberSinceDate(user?.createdAt);
+	const birthdayLabel = formatBirthday(user?.birthday);
 	const amIFollowing = user?.followers.some(id => id?.toString() === authUser?._id?.toString());
 
 
@@ -150,11 +151,17 @@ const ProfilePage = () => {
 								{!isMyProfile && (
 									<div className='flex gap-2'>
 										<button
-											className='btn btn-outline rounded-full btn-sm'
+											className='btn btn-outline rounded-full btn-sm btn-square'
 											onClick={() => startConversation(user?._id)}
 											disabled={isStartingConvo}
+											aria-label='Message'
+											title='Message'
 										>
-											{isStartingConvo ? "..." : "Message"}
+											{isStartingConvo ? (
+												<span className='loading loading-spinner loading-xs' />
+											) : (
+												<IoMailOutline className='w-5 h-5' />
+											)}
 										</button>
 										<button
 											className='btn btn-outline rounded-full btn-sm'
@@ -198,6 +205,12 @@ const ProfilePage = () => {
 													{user?.link}
 												</a>
 											</>
+										</div>
+									)}
+									{birthdayLabel && (
+										<div className='flex gap-2 items-center'>
+											<IoGiftOutline className='w-4 h-4 text-slate-500' />
+											<span className='text-sm text-slate-500'>{birthdayLabel}</span>
 										</div>
 									)}
 									<div className='flex gap-2 items-center'>

@@ -313,7 +313,7 @@ const Post = ({ post, variant = "feed" }) => {
 			{showLikesModal && <LikesModal postId={postId} onClose={() => setShowLikesModal(false)} />}
 			{showDeleteConfirm && (
 				<ConfirmDialog
-					title='Delete post?'
+					title='Delete tweet?'
 					message="This can't be undone and will be removed from your profile and timeline."
 					confirmLabel='Delete'
 					onConfirm={() => { setShowDeleteConfirm(false); deletePost(); }}
@@ -595,7 +595,7 @@ const Post = ({ post, variant = "feed" }) => {
 								rows={1}
 								className='textarea flex-1 p-2 rounded-xl text-[15px] leading-5 resize-none overflow-hidden border border-theme bg-base-100 focus:outline-none focus:border-twitter-reply'
 								style={{ height: "40px" }}
-								placeholder='Post your reply'
+								placeholder='Tweet your reply'
 								value={comment}
 								onChange={(e) => setComment(e.target.value)}
 							/>

@@ -34,7 +34,7 @@ const TrendsPanel = () => {
 					</p>
 					<p className='font-bold text-[15px]'>{trend.tag}</p>
 					<p className='text-xs text-muted-theme'>
-						{trend.starter ? "Tap to explore" : `${trend.count} posts`}
+						{trend.starter ? "Tap to explore" : `${trend.count} ${trend.count === 1 ? "tweet" : "tweets"}`}
 					</p>
 				</Link>
 			))}

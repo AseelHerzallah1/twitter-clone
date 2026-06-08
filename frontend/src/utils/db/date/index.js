@@ -20,23 +20,44 @@ export const formatPostDate = (createdAt) => {
 	}
 };
 
+const MONTHS = [
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December",
+];
+
+const parseLocalDate = (value) => {
+	if (!value) return null;
+	const raw = String(value).split("T")[0];
+	const [year, month, day] = raw.split("-").map(Number);
+	if (!year || !month || !day) return new Date(value);
+	return new Date(year, month - 1, day);
+};
+
+export const toDateInputValue = (value) => {
+	if (!value) return "";
+	return String(value).split("T")[0];
+};
+
+export const formatBirthday = (birthday) => {
+	const date = parseLocalDate(birthday);
+	if (!date || Number.isNaN(date.getTime())) return null;
+	const month = MONTHS[date.getMonth()];
+	return `Born ${month} ${date.getDate()}`;
+};
+
 export const formatMemberSinceDate = (createdAt) => {
 	const date = new Date(createdAt);
-	const months = [
-		"January",
-		"February",
-		"March",
-		"April",
-		"May",
-		"June",
-		"July",
-		"August",
-		"September",
-		"October",
-		"November",
-		"December",
-	];
-	const month = months[date.getMonth()];
+	const month = MONTHS[date.getMonth()];
 	const year = date.getFullYear();
 	return `Joined ${month} ${year}`;
 };

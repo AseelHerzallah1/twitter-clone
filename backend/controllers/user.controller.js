@@ -100,6 +100,7 @@ export const updateUser = async (req, res) => {
         newPassword,
         bio,
         link,
+        birthday,
         profileImage,
         coverImage,
     } = req.body;
@@ -144,6 +145,9 @@ export const updateUser = async (req, res) => {
         if (username !== undefined) user.username = username;
         if (bio !== undefined) user.bio = bio;
         if (link !== undefined) user.link = link;
+        if (birthday !== undefined) {
+            user.birthday = birthday ? new Date(birthday) : null;
+        }
 
         await user.save();
 

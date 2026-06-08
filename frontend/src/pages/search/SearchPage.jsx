@@ -33,7 +33,7 @@ const SearchPage = () => {
 			</div>
 
 			{!q.trim() && (
-				<p className='text-center py-12 text-muted-theme'>Try searching for people, posts, or #hashtags</p>
+				<p className='text-center py-12 text-muted-theme'>Try searching for people, tweets, or #hashtags</p>
 			)}
 
 			{isLoading && (
@@ -69,7 +69,7 @@ const SearchPage = () => {
 
 					{data?.posts?.length > 0 && (
 						<div>
-							<p className='px-4 py-3 font-bold text-xl'>Posts</p>
+							<p className='px-4 py-3 font-bold text-xl'>Tweets</p>
 							{data.posts.map((post) => (
 								<Post key={post._id} post={post} />
 							))}
@@ -79,7 +79,7 @@ const SearchPage = () => {
 					{data?.users?.length === 0 && data?.posts?.length === 0 && (
 						<p className='text-center py-12 px-4 text-muted-theme'>
 							{q.startsWith("#")
-								? `No posts with ${q} yet — be the first to tweet about it!`
+								? `No tweets with ${q} yet — be the first to tweet about it!`
 								: `No results for "${q}"`}
 						</p>
 					)}
