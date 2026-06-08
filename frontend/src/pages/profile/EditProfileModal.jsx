@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import useUpdateUserProfile from "../../hooks/useUpdateUserProfile";
 import { toDateInputValue } from "../../utils/db/date/index";
 
+const normalizeLink = (link) => {
+	const trimmed = link.trim();
+	if (!trimmed) return "";
+	if (/^https?:\/\//i.test(trimmed)) return trimmed;
+	return `https://${trimmed}`;
+};
+
 const EditProfileModal = ({ authUser }) => {
 	const [open, setOpen] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +59,7 @@ const EditProfileModal = ({ authUser }) => {
 			username: formData.username,
 			email: formData.email,
 			bio: formData.bio,
-			link: formData.link,
+			link: normalizeLink(formData.link),
 			birthday: formData.birthday || null,
 		};
 
@@ -142,13 +149,16 @@ const EditProfileModal = ({ authUser }) => {
 							<div>
 								<label className='text-sm font-medium mb-1 block'>Website</label>
 								<input
-									type='url'
+									type='text'
 									className='w-full input input-bordered rounded-xl'
 									value={formData.link}
 									name='link'
 									onChange={handleInputChange}
-									placeholder='https://'
+									placeholder='yoursite.com'
 								/>
+								<p className='text-xs text-muted-theme mt-1'>
+									https:// is added automatically if you leave it out.
+								</p>
 							</div>
 
 							<div>
