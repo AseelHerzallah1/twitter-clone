@@ -12,6 +12,20 @@ const postSchema = new mongoose.Schema({
     img:{
         type: String,
     },
+    quotedPost: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post',
+        default: null,
+    },
+    retweetOf: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post',
+        default: null,
+    },
+    editedAt: {
+        type: Date,
+        default: null,
+    },
     likes: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'

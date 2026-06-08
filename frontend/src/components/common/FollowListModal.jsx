@@ -20,7 +20,7 @@ const FollowListModal = ({ username, type, onClose }) => {
 
 	return (
 		<dialog open className='modal'>
-			<div className='modal-box border border-gray-700 rounded-md max-w-sm'>
+			<div className='modal-box border border-theme rounded-md max-w-sm'>
 				<div className='flex justify-between items-center mb-4'>
 					<h3 className='font-bold text-lg capitalize'>{type}</h3>
 					<button className='btn btn-sm btn-ghost' onClick={onClose}>✕</button>
@@ -38,7 +38,7 @@ const FollowListModal = ({ username, type, onClose }) => {
 						>
 							<div className='avatar'>
 								<div className='w-9 rounded-full'>
-									<img src={user.profileImage || "/avatar-placeholder.png"} />
+									<img src={user.profileImage || "/avatar-placeholder.svg"} />
 								</div>
 							</div>
 							<div>

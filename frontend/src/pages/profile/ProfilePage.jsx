@@ -1,27 +1,27 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import BackButton from "../../components/common/BackButton";
 
 import Posts from "../../components/common/Posts";
 import ProfileHeaderSkeleton from "../../components/skeletons/ProfileHeaderSkeleton";
 import FollowListModal from "../../components/common/FollowListModal";
 import EditProfileModal from "./EditProfileModal";
 
-import { POSTS } from "../../utils/db/dummy";
-
-import { FaArrowLeft } from "react-icons/fa6";
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaLink } from "react-icons/fa";
 import { MdEdit } from "react-icons/md";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { useEffect } from "react";
 import { formatMemberSinceDate } from "../../utils/db/date/index";
 import useFollow from "../../hooks/useFollow";
+import useStartConversation from "../../hooks/useStartConversation";
 import useUpdateUserProfile from "../../hooks/useUpdateUserProfile";
+import ImageCropModal from "../../components/common/ImageCropModal";
 
 const ProfilePage = () => {
 	const [coverImg, setCoverImg] = useState(null);
 	const [profileImg, setProfileImg] = useState(null);
+	const [cropState, setCropState] = useState(null);
 	const [feedType, setFeedType] = useState("posts");
 	const [followModal, setFollowModal] = useState(null); // "followers" | "following" | null
 
@@ -30,13 +30,12 @@ const ProfilePage = () => {
 	const { username } = useParams();
 
 	const { follow, isPending } = useFollow();
+	const { mutate: startConversation, isPending: isStartingConvo } = useStartConversation();
 	const {data: authUser} = useQuery({queryKey: ["authUser"], queryFn: () => null, enabled: false});
 
 	const {
 		data: user,
 		isLoading,
-		refetch,
-		isRefetching,
 	} = useQuery({
 		queryKey: ["userProfile", username],
 		queryFn: async () => {
@@ -58,50 +57,61 @@ const ProfilePage = () => {
 	const amIFollowing = user?.followers.some(id => id?.toString() === authUser?._id?.toString());
 
 
-	const handleImgChange = (e, state) => { 
+	const handleImgChange = (e, type) => {
 		const file = e.target.files[0];
-		if (file) {
-			const reader = new FileReader();
-			reader.onload = () => {
-				state === "coverImg" && setCoverImg(reader.result);
-				state === "profileImg" && setProfileImg(reader.result);
-			};
-			reader.readAsDataURL(file);
-		}
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = () => {
+			setCropState({ src: reader.result, type });
+		};
+		reader.readAsDataURL(file);
+		e.target.value = "";
 	};
 
-	useEffect(() => {
-    refetch();
-	}, [username, refetch]);
+	const handleCropComplete = (croppedImage) => {
+		if (cropState?.type === "coverImg") setCoverImg(croppedImage);
+		if (cropState?.type === "profileImg") setProfileImg(croppedImage);
+		setCropState(null);
+	};
+
+	const handleSaveImages = async () => {
+		const payload = {};
+		if (coverImg) payload.coverImage = coverImg;
+		if (profileImg) payload.profileImage = profileImg;
+		if (Object.keys(payload).length === 0) return;
+
+		await updateProfile(payload);
+		setCoverImg(null);
+		setProfileImg(null);
+	};
 
 	return (
 		<>
-			<div className='flex-[4_4_0]  border-r border-gray-700 min-h-screen '>
+			<div className='w-full min-h-screen'>
 				{/* HEADER */}
-				{(isLoading || isRefetching) && <ProfileHeaderSkeleton />}
-				{!isLoading && !isRefetching && !user && <p className='text-center text-lg mt-4'>User not found</p>}
+				{isLoading && <ProfileHeaderSkeleton />}
+				{!isLoading && !user && <p className='text-center text-lg mt-4'>User not found</p>}
 				<div className='flex flex-col'>
-					{!isLoading && !isRefetching && user && (
+					{!isLoading && user && (
 						<>
-							<div className='flex gap-10 px-4 py-2 items-center'>
-								<Link to='/'>
-									<FaArrowLeft className='w-4 h-4' />
-								</Link>
+							<div className='sticky-page-header bg-base-100/80 backdrop-blur-md flex gap-6 px-4 py-2 items-center border-b border-theme'>
+								<BackButton className='hover:bg-base-200 rounded-full p-2 transition-colors' />
 								<div className='flex flex-col'>
-									<p className='font-bold text-lg'>{user?.fullName}</p>
-									<span className='text-sm text-slate-500'>{user?.tweetsCount} tweets</span>
+									<p className='font-bold text-lg leading-tight'>{user?.fullName}</p>
+									<span className='text-sm text-muted-theme'>{user?.tweetsCount} Tweets</span>
 								</div>
 							</div>
 							{/* COVER IMG */}
 							<div className='relative group/cover'>
 								<img
-									src={coverImg || user?.coverImage || "/cover.png"}
+									src={coverImg || user?.coverImage || "/cover.svg"}
 									className='h-52 w-full object-cover'
 									alt='cover image'
 								/>
 								{isMyProfile && (
 									<div
-										className='absolute top-2 right-2 rounded-full p-2 bg-gray-800 bg-opacity-75 cursor-pointer opacity-0 group-hover/cover:opacity-100 transition duration-200'
+										className='absolute top-2 right-2 rounded-full p-2 bg-gray-800 bg-opacity-75 cursor-pointer opacity-100 sm:opacity-0 sm:group-hover/cover:opacity-100 transition duration-200'
 										onClick={() => coverImgRef.current.click()}
 									>
 										<MdEdit className='w-5 h-5 text-white' />
@@ -123,8 +133,8 @@ const ProfilePage = () => {
 								{/* USER AVATAR */}
 								<div className='avatar absolute -bottom-16 left-4'>
 									<div className='w-32 rounded-full relative group/avatar'>
-										<img src={profileImg || user?.profileImage || "/avatar-placeholder.png"} />
-										<div className='absolute top-5 right-3 p-1 bg-primary rounded-full group-hover/avatar:opacity-100 opacity-0 cursor-pointer'>
+										<img src={profileImg || user?.profileImage || "/avatar-placeholder.svg"} />
+										<div className='absolute top-5 right-3 p-1 bg-primary rounded-full opacity-100 sm:opacity-0 sm:group-hover/avatar:opacity-100 cursor-pointer'>
 											{isMyProfile && (
 												<MdEdit
 													className='w-4 h-4 text-white'
@@ -135,28 +145,34 @@ const ProfilePage = () => {
 									</div>
 								</div>
 							</div>
-							<div className='flex justify-end px-4 mt-5'>
+							<div className='flex justify-end flex-wrap gap-2 px-4 mt-5'>
 								{isMyProfile && <EditProfileModal authUser={authUser} />}
 								{!isMyProfile && (
-									<button
-										className='btn btn-outline rounded-full btn-sm'
-										onClick={() =>follow(user?._id)}
-									>
-										{isPending && "Loading..."}
-										{!isPending && amIFollowing && "Unfollow"}
-										{!isPending && !amIFollowing && "Follow"}
-									</button>
+									<div className='flex gap-2'>
+										<button
+											className='btn btn-outline rounded-full btn-sm'
+											onClick={() => startConversation(user?._id)}
+											disabled={isStartingConvo}
+										>
+											{isStartingConvo ? "..." : "Message"}
+										</button>
+										<button
+											className='btn btn-outline rounded-full btn-sm'
+											onClick={() => follow(user?._id)}
+										>
+											{isPending && "Loading..."}
+											{!isPending && amIFollowing && "Unfollow"}
+											{!isPending && !amIFollowing && "Follow"}
+										</button>
+									</div>
 								)}
 								{(coverImg || profileImg) && (
 									<button
-										className='btn btn-primary rounded-full btn-sm text-white px-4 ml-2'
-										onClick={async () => {
-											await updateProfile({coverImage: coverImg, profileImage: profileImg});
-											setCoverImg(null);
-											setProfileImg(null);
-										}}
+										className='btn btn-primary rounded-full btn-sm text-white px-4'
+										onClick={handleSaveImages}
+										disabled={isUpdatingProfile}
 									>
-										{isUpdatingProfile ? "Updating..." : "update"}
+										{isUpdatingProfile ? "Saving..." : "Save"}
 									</button>
 								)}
 							</div>
@@ -177,7 +193,7 @@ const ProfilePage = () => {
 													href={user?.link}
 													target='_blank'
 													rel='noreferrer'
-													className='text-sm text-blue-500 hover:underline'
+													className='text-sm text-blue-500 hover:underline break-all'
 												>
 													{user?.link}
 												</a>
@@ -200,25 +216,51 @@ const ProfilePage = () => {
 									</div>
 								</div>
 							</div>
-							<div className='flex w-full border-b border-gray-700 mt-4'>
-								<div
-									className='flex justify-center flex-1 p-3 hover:bg-secondary transition duration-300 relative cursor-pointer'
+							<div className='flex w-full border-b border-theme overflow-x-auto scrollbar-hide'>
+								<button
+									className={`flex justify-center flex-1 min-w-[4.5rem] shrink-0 whitespace-nowrap py-4 hover-bg-theme transition duration-300 relative cursor-pointer font-medium text-sm sm:text-base ${
+										feedType === "posts" ? "font-bold" : "text-muted-theme"
+									}`}
 									onClick={() => setFeedType("posts")}
 								>
 									Tweets
 									{feedType === "posts" && (
-										<div className='absolute bottom-0 w-10 h-1 rounded-full bg-primary' />
+										<div className='absolute bottom-0 w-14 h-1 rounded-full bg-primary' />
 									)}
-								</div>
-								<div
-									className='flex justify-center flex-1 p-3 text-slate-500 hover:bg-secondary transition duration-300 relative cursor-pointer'
+								</button>
+								<button
+									className={`flex justify-center flex-1 min-w-[4.5rem] shrink-0 whitespace-nowrap py-4 hover-bg-theme transition duration-300 relative cursor-pointer font-medium text-sm sm:text-base ${
+										feedType === "replies" ? "font-bold" : "text-muted-theme"
+									}`}
+									onClick={() => setFeedType("replies")}
+								>
+									Replies
+									{feedType === "replies" && (
+										<div className='absolute bottom-0 w-14 h-1 rounded-full bg-primary' />
+									)}
+								</button>
+								<button
+									className={`flex justify-center flex-1 min-w-[4.5rem] shrink-0 whitespace-nowrap py-4 hover-bg-theme transition duration-300 relative cursor-pointer font-medium text-sm sm:text-base ${
+										feedType === "media" ? "font-bold" : "text-muted-theme"
+									}`}
+									onClick={() => setFeedType("media")}
+								>
+									Media
+									{feedType === "media" && (
+										<div className='absolute bottom-0 w-14 h-1 rounded-full bg-primary' />
+									)}
+								</button>
+								<button
+									className={`flex justify-center flex-1 min-w-[4.5rem] shrink-0 whitespace-nowrap py-4 hover-bg-theme transition duration-300 relative cursor-pointer font-medium text-sm sm:text-base ${
+										feedType === "likes" ? "font-bold" : "text-muted-theme"
+									}`}
 									onClick={() => setFeedType("likes")}
 								>
 									Likes
 									{feedType === "likes" && (
-										<div className='absolute bottom-0 w-10  h-1 rounded-full bg-primary' />
+										<div className='absolute bottom-0 w-14 h-1 rounded-full bg-primary' />
 									)}
-								</div>
+								</button>
 							</div>
 						</>
 					)}
@@ -233,6 +275,15 @@ const ProfilePage = () => {
 					onClose={() => setFollowModal(null)}
 				/>
 			)}
+			<ImageCropModal
+				key={cropState?.src || "crop"}
+				open={Boolean(cropState)}
+				imageSrc={cropState?.src}
+				aspect={cropState?.type === "coverImg" ? 3 : 1}
+				title={cropState?.type === "coverImg" ? "Edit cover photo" : "Edit profile photo"}
+				onComplete={handleCropComplete}
+				onCancel={() => setCropState(null)}
+			/>
 		</>
 	);
 };

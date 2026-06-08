@@ -81,9 +81,28 @@ export const getSuggestedUsers = async (req, res) => {
     }
 };
 
+const destroyCloudinaryImage = async (imageUrl) => {
+    if (!imageUrl || !imageUrl.includes("cloudinary")) return;
+    try {
+        const publicId = imageUrl.split("/").pop().split(".")[0];
+        await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+        console.warn("Could not delete old Cloudinary image:", error.message);
+    }
+};
+
 export const updateUser = async (req, res) => {
-    const { fullName, email, username, currentPassword, newPassword, bio, link } = req.body;
-    let { profileImage, coverImage } = req.body;
+    const {
+        fullName,
+        email,
+        username,
+        currentPassword,
+        newPassword,
+        bio,
+        link,
+        profileImage,
+        coverImage,
+    } = req.body;
     const userId = req.user._id;
 
     try {
@@ -109,36 +128,34 @@ export const updateUser = async (req, res) => {
         }
 
         if (profileImage) {
-            if (user.profileImage) {
-                await cloudinary.uploader.destroy(user.profileImage.split("/").pop().split(".")[0]);
-            }
+            await destroyCloudinaryImage(user.profileImage);
             const uploadedResponse = await cloudinary.uploader.upload(profileImage);
-            profileImage = uploadedResponse.secure_url;
+            user.profileImage = uploadedResponse.secure_url;
         }
 
         if (coverImage) {
-            if (user.coverImage) {
-                await cloudinary.uploader.destroy(user.coverImage.split("/").pop().split(".")[0]);
-            }
+            await destroyCloudinaryImage(user.coverImage);
             const uploadedResponse = await cloudinary.uploader.upload(coverImage);
-            coverImage = uploadedResponse.secure_url;
+            user.coverImage = uploadedResponse.secure_url;
         }
 
-        user.fullName = fullName || user.fullName;
-        user.email = email || user.email;
-        user.username = username || user.username;
-        user.bio = bio || user.bio;
-        user.link = link || user.link;
-        user.profileImage = profileImage || user.profileImage;
-        user.coverImage = coverImage || user.coverImage;
+        if (fullName !== undefined) user.fullName = fullName;
+        if (email !== undefined) user.email = email;
+        if (username !== undefined) user.username = username;
+        if (bio !== undefined) user.bio = bio;
+        if (link !== undefined) user.link = link;
 
-        const updatedUser = await user.save();
-        // password should not be sent in the response
-        updatedUser.password = null;
+        await user.save();
+
+        const updatedUser = await User.findById(userId).select("-password");
         return res.status(200).json({ user: updatedUser, message: "User updated successfully" });
 
     } catch (error) {
         console.error("Error updating user:", error);
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyPattern || {})[0] || "field";
+            return res.status(400).json({ message: `That ${field} is already in use` });
+        }
         return res.status(500).json({ message: "Server error" });
     }
 };

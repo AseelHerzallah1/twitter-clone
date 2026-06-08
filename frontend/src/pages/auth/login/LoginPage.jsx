@@ -2,12 +2,11 @@ import { useState, useEffect } from "react";
 import { MdLightMode, MdDarkMode } from "react-icons/md";
 import { Link } from "react-router-dom";
 
-import XSvg from "../../../components/svgs/X";
+import TwitterBird from "../../../components/svgs/TwitterBird";
 
 import { MdOutlineMail } from "react-icons/md";
 import { MdPassword } from "react-icons/md";
 import {useMutation} from "@tanstack/react-query";
-// import toast from 'react-hot-toast';
 import { useQueryClient } from "@tanstack/react-query";
 
 const LoginPage = () => {
@@ -42,7 +41,7 @@ const LoginPage = () => {
 				});
 
 				const data = await res.json();
-				if(!res.ok) throw new Error(data.error || "Failed to create account");
+				if(!res.ok) throw new Error(data.error || "Failed to log in");
 			} catch (error) {
 				console.error(error);
 				throw error;
@@ -67,46 +66,52 @@ const LoginPage = () => {
 			<button onClick={toggleTheme} className='absolute top-4 right-4 btn btn-ghost btn-circle'>
 				{theme === "black" ? <MdLightMode className='w-5 h-5' /> : <MdDarkMode className='w-5 h-5' />}
 			</button>
-			<div className='flex-1 hidden lg:flex items-center  justify-center'>
-				<XSvg className='lg:w-2/3 fill-primary' />
+			<div className='flex-1 hidden lg:flex flex-col items-center justify-center px-8'>
+				<TwitterBird className='w-80 fill-primary' />
+				<h2 className='text-6xl font-bold mt-12 max-w-md leading-tight'>
+					See what&apos;s happening in the world right now.
+				</h2>
 			</div>
-			<div className='flex-1 flex flex-col justify-center items-center'>
-				<form className='flex gap-4 flex-col' onSubmit={handleSubmit}>
-					<XSvg className='w-24 lg:hidden fill-primary' />
-					<h1 className='text-4xl font-extrabold'>{"Let's"} go.</h1>
-					<label className='input input-bordered rounded flex items-center gap-2'>
-						<MdOutlineMail />
-						<input
-							type='text'
-							className='grow'
-							placeholder='username'
-							name='username'
-							onChange={handleInputChange}
-							value={formData.username}
-						/>
-					</label>
+			<div className='flex-1 flex flex-col justify-center items-center px-8'>
+				<div className='w-full max-w-sm'>
+					<TwitterBird className='w-12 h-12 lg:hidden fill-primary mb-6' />
+					<h1 className='text-4xl font-bold mb-8'>Happening now</h1>
+					<h2 className='text-2xl font-bold mb-6'>Join today.</h2>
+					<form className='flex gap-4 flex-col' onSubmit={handleSubmit}>
+						<label className='input input-bordered rounded flex items-center gap-2 border-theme'>
+							<MdOutlineMail />
+							<input
+								type='text'
+								className='grow'
+								placeholder='Username'
+								name='username'
+								onChange={handleInputChange}
+								value={formData.username}
+							/>
+						</label>
 
-					<label className='input input-bordered rounded flex items-center gap-2'>
-						<MdPassword />
-						<input
-							type='password'
-							className='grow'
-							placeholder='Password'
-							name='password'
-							onChange={handleInputChange}
-							value={formData.password}
-						/>
-					</label>
-					<button className='btn rounded-full btn-primary text-white'>
-						{isPending ? "Loading..." : "Login"}
-					</button>
-					{isError && <p className='text-red-500'>{error.message}</p>}
-				</form>
-				<div className='flex flex-col gap-2 mt-4'>
-					<p className="text-lg">{"Don't"} have an account?</p>
-					<Link to='/signup'>
-						<button className='btn rounded-full btn-primary text-white btn-outline w-full'>Sign up</button>
-					</Link>
+						<label className='input input-bordered rounded flex items-center gap-2 border-theme'>
+							<MdPassword />
+							<input
+								type='password'
+								className='grow'
+								placeholder='Password'
+								name='password'
+								onChange={handleInputChange}
+								value={formData.password}
+							/>
+						</label>
+						<button className='btn rounded-full btn-primary text-white font-bold'>
+							{isPending ? "Signing in..." : "Sign in"}
+						</button>
+						{isError && <p className='text-red-500'>{error.message}</p>}
+					</form>
+					<div className='flex flex-col gap-2 mt-8'>
+						<p className="text-lg font-bold">Don&apos;t have an account?</p>
+						<Link to='/signup'>
+							<button className='btn rounded-full btn-primary text-white btn-outline w-full font-bold'>Sign up</button>
+						</Link>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { generateTokenAndSetCookie } from "../lib/utils/generateToken.js";
+import { getAuthCookieOptions } from "../lib/utils/cookieOptions.js";
 import User from "../models/user.model.js";
 
 export const signup = async (req, res) => {
@@ -56,8 +57,8 @@ export const signup = async (req, res) => {
                     email: newUser.email,
                     followers: newUser.followers,
                     following: newUser.following,
-                    profileImg: newUser.profileImg,
-                    coverImg: newUser.coverImg
+                    profileImage: newUser.profileImage,
+                    coverImage: newUser.coverImage
                 }
             });
 
@@ -98,8 +99,8 @@ export const login = async (req, res) => {
                 email: user.email,
                 followers: user.followers,
                 following: user.following,
-                profileImg: user.profileImg,
-                coverImg: user.coverImg
+                profileImage: user.profileImage,
+                coverImage: user.coverImage
             }
         });
 
@@ -116,7 +117,7 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try{
-        res.cookie("jwt", "", { maxAge: 0 });// set the cookie to expire immediately
+        res.cookie("jwt", "", getAuthCookieOptions(0));
         res.status(200).json({
             message: "Logout successful"
         });

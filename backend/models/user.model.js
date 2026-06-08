@@ -53,6 +53,16 @@ const userSchema = new mongoose.Schema({
         ref: "Post",
         default: [],
     }],
+    bookmarkedPosts: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+        default: [],
+    }],
+    pinnedPost: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+        default: null,
+    },
     },
     { timestamps: true }
 

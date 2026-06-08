@@ -1,126 +1,245 @@
-import { useState ,useEffect } from "react";
+import { useState, useEffect } from "react";
 import useUpdateUserProfile from "../../hooks/useUpdateUserProfile";
 
 const EditProfileModal = ({ authUser }) => {
+	const [open, setOpen] = useState(false);
+	const [showPassword, setShowPassword] = useState(false);
 	const [formData, setFormData] = useState({
 		fullName: "",
 		username: "",
 		email: "",
 		bio: "",
 		link: "",
-		newPassword: "",
 		currentPassword: "",
+		newPassword: "",
+		confirmPassword: "",
 	});
-	
-	const {updateProfile, isUpdatingProfile} = useUpdateUserProfile();
+
+	const { updateProfile, isUpdatingProfile } = useUpdateUserProfile();
+
+	useEffect(() => {
+		if (!authUser) return;
+		setFormData({
+			fullName: authUser.fullName || "",
+			username: authUser.username || "",
+			email: authUser.email || "",
+			bio: authUser.bio || "",
+			link: authUser.link || "",
+			currentPassword: "",
+			newPassword: "",
+			confirmPassword: "",
+		});
+	}, [authUser, open]);
 
 	const handleInputChange = (e) => {
 		setFormData({ ...formData, [e.target.name]: e.target.value });
 	};
 
-	useEffect(() => {
-		if(authUser){
-			setFormData({
-				fullName: authUser.fullName || "",
-				username: authUser.username || "",
-				email: authUser.email || "",
-				bio: authUser.bio || "",
-				link: authUser.link || "",
-				newPassword: "",
-				currentPassword: ""
-			});
+	const handleSubmit = async (e) => {
+		e.preventDefault();
+
+		if (showPassword) {
+			if (!formData.currentPassword || !formData.newPassword) return;
+			if (formData.newPassword.length < 6) return;
+			if (formData.newPassword !== formData.confirmPassword) return;
 		}
-	}, [authUser]);
+
+		const payload = {
+			fullName: formData.fullName,
+			username: formData.username,
+			email: formData.email,
+			bio: formData.bio,
+			link: formData.link,
+		};
+
+		if (showPassword) {
+			payload.currentPassword = formData.currentPassword;
+			payload.newPassword = formData.newPassword;
+		}
+
+		try {
+			await updateProfile(payload);
+			setOpen(false);
+			setShowPassword(false);
+		} catch {
+			// Error toast handled in hook
+		}
+	};
+
+	const passwordMismatch =
+		showPassword && formData.confirmPassword && formData.newPassword !== formData.confirmPassword;
 
 	return (
 		<>
 			<button
+				type='button'
 				className='btn btn-outline rounded-full btn-sm'
-				onClick={() => document.getElementById("edit_profile_modal").showModal()}
+				onClick={() => setOpen(true)}
 			>
 				Edit profile
 			</button>
-			<dialog id='edit_profile_modal' className='modal'>
-				<div className='modal-box border rounded-md border-gray-700 shadow-md'>
-					<h3 className='font-bold text-lg my-3'>Update Profile</h3>
-					<form
-						className='flex flex-col gap-4'
-						onSubmit={(e) => {
-							e.preventDefault();
-							updateProfile();
-						}}
-					>
-						<div className='flex flex-wrap gap-2'>
-							<input
-								type='text'
-								placeholder='Full Name'
-								className='flex-1 input border border-gray-700 rounded p-2 input-md'
-								value={formData.fullName}
-								name='fullName'
-								onChange={handleInputChange}
-							/>
-							<input
-								type='text'
-								placeholder='Username'
-								className='flex-1 input border border-gray-700 rounded p-2 input-md'
-								value={formData.username}
-								name='username'
-								onChange={handleInputChange}
-							/>
-						</div>
-						<div className='flex flex-wrap gap-2'>
-							<input
-								type='email'
-								placeholder='Email'
-								className='flex-1 input border border-gray-700 rounded p-2 input-md'
-								value={formData.email}
-								name='email'
-								onChange={handleInputChange}
-							/>
-							<textarea
-								placeholder='Bio'
-								className='flex-1 input border border-gray-700 rounded p-2 input-md'
-								value={formData.bio}
-								name='bio'
-								onChange={handleInputChange}
-							/>
-						</div>
-						<div className='flex flex-wrap gap-2'>
-							<input
-								type='password'
-								placeholder='Current Password'
-								className='flex-1 input border border-gray-700 rounded p-2 input-md'
-								value={formData.currentPassword}
-								name='currentPassword'
-								onChange={handleInputChange}
-							/>
-							<input
-								type='password'
-								placeholder='New Password'
-								className='flex-1 input border border-gray-700 rounded p-2 input-md'
-								value={formData.newPassword}
-								name='newPassword'
-								onChange={handleInputChange}
-							/>
-						</div>
-						<input
-							type='text'
-							placeholder='Link'
-							className='flex-1 input border border-gray-700 rounded p-2 input-md'
-							value={formData.link}
-							name='link'
-							onChange={handleInputChange}
-						/>
-						<button className='btn btn-primary rounded-full btn-sm text-white'>
-							{isUpdatingProfile ? "Updating..." : "Update"}
-						</button>
+
+			{open && (
+				<dialog open className='modal modal-open'>
+					<div className='modal-box border border-theme rounded-2xl max-w-lg w-full'>
+						<h3 className='font-bold text-xl mb-1'>Edit profile</h3>
+						<p className='text-muted-theme text-sm mb-5'>Update your public profile and account details.</p>
+
+						<form className='flex flex-col gap-4' onSubmit={handleSubmit}>
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Name</label>
+								<input
+									type='text'
+									className='w-full input input-bordered rounded-xl'
+									value={formData.fullName}
+									name='fullName'
+									onChange={handleInputChange}
+									required
+								/>
+							</div>
+
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Username</label>
+								<input
+									type='text'
+									className='w-full input input-bordered rounded-xl'
+									value={formData.username}
+									name='username'
+									onChange={handleInputChange}
+									required
+								/>
+							</div>
+
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Email</label>
+								<input
+									type='email'
+									className='w-full input input-bordered rounded-xl'
+									value={formData.email}
+									name='email'
+									onChange={handleInputChange}
+									required
+								/>
+							</div>
+
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Bio</label>
+								<textarea
+									className='w-full textarea textarea-bordered rounded-xl min-h-[80px]'
+									value={formData.bio}
+									name='bio'
+									onChange={handleInputChange}
+									maxLength={160}
+									placeholder='Tell people about yourself'
+								/>
+								<p className='text-xs text-muted-theme text-right mt-1'>{formData.bio.length}/160</p>
+							</div>
+
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Website</label>
+								<input
+									type='url'
+									className='w-full input input-bordered rounded-xl'
+									value={formData.link}
+									name='link'
+									onChange={handleInputChange}
+									placeholder='https://'
+								/>
+							</div>
+
+							<div className='border-t border-theme pt-4'>
+								{!showPassword ? (
+									<button
+										type='button'
+										onClick={() => setShowPassword(true)}
+										className='text-primary text-sm font-medium hover:underline'
+									>
+										Change password
+									</button>
+								) : (
+									<div className='flex flex-col gap-3'>
+										<p className='font-medium text-sm'>Change password</p>
+										<input
+											type='password'
+											placeholder='Current password'
+											className='w-full input input-bordered rounded-xl'
+											value={formData.currentPassword}
+											name='currentPassword'
+											onChange={handleInputChange}
+											autoComplete='current-password'
+										/>
+										<input
+											type='password'
+											placeholder='New password (min. 6 characters)'
+											className='w-full input input-bordered rounded-xl'
+											value={formData.newPassword}
+											name='newPassword'
+											onChange={handleInputChange}
+											autoComplete='new-password'
+										/>
+										<input
+											type='password'
+											placeholder='Confirm new password'
+											className='w-full input input-bordered rounded-xl'
+											value={formData.confirmPassword}
+											name='confirmPassword'
+											onChange={handleInputChange}
+											autoComplete='new-password'
+										/>
+										{passwordMismatch && (
+											<p className='text-red-500 text-sm'>Passwords do not match</p>
+										)}
+										<button
+											type='button'
+											onClick={() => {
+												setShowPassword(false);
+												setFormData((prev) => ({
+													...prev,
+													currentPassword: "",
+													newPassword: "",
+													confirmPassword: "",
+												}));
+											}}
+											className='text-sm text-muted-theme hover:underline self-start'
+										>
+											Cancel password change
+										</button>
+									</div>
+								)}
+							</div>
+
+							<div className='flex gap-2 justify-end pt-2'>
+								<button
+									type='button'
+									className='btn btn-ghost rounded-full'
+									onClick={() => setOpen(false)}
+								>
+									Cancel
+								</button>
+								<button
+									type='submit'
+									className='btn btn-primary rounded-full text-white'
+									disabled={
+										isUpdatingProfile ||
+										passwordMismatch ||
+										(showPassword &&
+											(!formData.currentPassword ||
+												!formData.newPassword ||
+												formData.newPassword.length < 6))
+									}
+								>
+									{isUpdatingProfile ? "Saving..." : "Save"}
+								</button>
+							</div>
+						</form>
+					</div>
+					<form method='dialog' className='modal-backdrop'>
+						<button type='button' onClick={() => setOpen(false)}>close</button>
 					</form>
-				</div>
-				<form method='dialog' className='modal-backdrop'>
-					<button className='outline-none'>close</button>
-				</form>
-			</dialog>
+				</dialog>
+			)}
 		</>
 	);
 };
+
 export default EditProfileModal;

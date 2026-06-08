@@ -5,33 +5,39 @@ import SignUpPage from './pages/auth/signup/SignUpPage';
 import LoginPage from './pages/auth/login/LoginPage';
 import NotificationPage from './pages/notifications/NotificationsPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import PostDetailPage from './pages/post/PostDetailPage';
+import BookmarksPage from './pages/bookmarks/BookmarksPage';
+import SearchPage from './pages/search/SearchPage';
+import MessagesPage from './pages/messages/MessagesPage';
 import { Navigate } from 'react-router-dom';
 
 import Sidebar from './components/common/Sidebar';
+import MobileNav from './components/common/MobileNav';
 import RightPanel from './components/common/RightPanel';
+import ComposeModal from './components/common/ComposeModal';
+import SettingsModal from './components/common/SettingsModal';
+import { ThemeProvider } from './context/ThemeContext';
+import NestPanel from './components/nest/NestPanel';
+import NestFab from './components/nest/NestFab';
 
 import {Toaster} from "react-hot-toast";
 import { useQuery } from '@tanstack/react-query';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
-function App() {
+function AppContent() {
   const { data: authUser, isLoading } = useQuery({
     queryKey : ["authUser"],
-    queryFn: async() => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-        if(data.error) return null;
-        if(!res.ok){
-          throw new Error(data.error || "Failed to fetch authenticated user");
-        }
-        return data;
-      } catch (error) {
-        throw new Error(error);
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch authenticated user");
       }
+      return data;
     },
     retry: false,
     staleTime: Infinity,
+    placeholderData: (previous) => previous,
   });
 
 if(isLoading){
@@ -41,20 +47,57 @@ if(isLoading){
       </div>
     )
   }
+
+  if (!authUser) {
+    return (
+      <>
+        <Routes>
+          <Route path='/login' element={<LoginPage />} />
+          <Route path='/signup' element={<SignUpPage />} />
+          <Route path='*' element={<Navigate to="/login" />} />
+        </Routes>
+        <Toaster />
+      </>
+    );
+  }
+
   return (
-    <div className='flex max-w-6xl mx-auto'>
-      {/* Common conponent bec it's not wrapped with Routes */}
-      {authUser && <Sidebar />}
-      <Routes>
-        <Route path='/' element={authUser ? <HomePage /> : <Navigate to="/login" />} />
-        <Route path='/login' element={!authUser ? <LoginPage/> : <Navigate to="/" />} />
-        <Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to="/" />} />
-        <Route path='/notifications' element={authUser ? <NotificationPage /> : <Navigate to="/login" />} />
-        <Route path='/profile/:username' element={authUser ? <ProfilePage /> : <Navigate to="/login" />} />
-      </Routes>
-      {authUser && <RightPanel/>}
+    <>
+      <div className='flex w-full min-h-screen'>
+        <Sidebar />
+        <div className='flex flex-1 min-w-0 flex-col'>
+          <MobileNav />
+          <div className='flex flex-1 min-w-0'>
+          <main className='flex-1 min-w-0 w-full lg:max-w-[600px] lg:border-r border-theme safe-bottom lg:pb-0'>
+            <Routes>
+              <Route path='/' element={<HomePage />} />
+              <Route path='/search' element={<SearchPage />} />
+              <Route path='/messages' element={<MessagesPage />} />
+              <Route path='/notifications' element={<NotificationPage />} />
+              <Route path='/bookmarks' element={<BookmarksPage />} />
+              <Route path='/post/:id' element={<PostDetailPage />} />
+              <Route path='/profile/:username' element={<ProfilePage />} />
+              <Route path='*' element={<Navigate to="/" />} />
+            </Routes>
+          </main>
+          <RightPanel />
+          </div>
+        </div>
+      </div>
+      <ComposeModal />
+      <SettingsModal />
+      <NestPanel />
+      <NestFab />
       <Toaster />
-    </div>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

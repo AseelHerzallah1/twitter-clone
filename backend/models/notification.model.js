@@ -14,7 +14,7 @@ to: {
 type: {
     type: String,
     required: true,
-    enum: ['follow', 'like', 'comment', 'retweet']
+    enum: ['follow', 'like', 'comment', 'retweet', 'quote']
 },
 read: {
     type: Boolean,
