@@ -1,7 +1,7 @@
 import express from 'express';
 import { protectRoute } from '../middleware/protectRoute.js';
 
-import { createPost, deletePost, commentOnPost, likeUnlikePost, getAllPosts, getLikedPosts, getFollowingPosts, getUserPosts, getUserReplies, getUserMedia, getPostLikers, pinPost, unpinPost, retweetPost, editPost, getPostById, bookmarkPost, getBookmarkedPosts } from '../controllers/post.controller.js';
+import { createPost, deletePost, commentOnPost, editComment, deleteComment, likeUnlikeComment, likeUnlikePost, getAllPosts, getLikedPosts, getFollowingPosts, getUserPosts, getUserReplies, getUserMedia, getPostLikers, pinPost, unpinPost, retweetPost, editPost, getPostById, bookmarkPost, getBookmarkedPosts } from '../controllers/post.controller.js';
 
 
 const router = express.Router();
@@ -22,6 +22,9 @@ router.post("/like/:id", protectRoute, likeUnlikePost);
 router.post("/retweet/:id", protectRoute, retweetPost);
 router.post("/bookmark/:id", protectRoute, bookmarkPost);
 router.post("/comment/:id", protectRoute, commentOnPost);
+router.put("/:id/comments/:commentId", protectRoute, editComment);
+router.delete("/:id/comments/:commentId", protectRoute, deleteComment);
+router.post("/:id/comments/:commentId/like", protectRoute, likeUnlikeComment);
 router.delete("/:id", protectRoute, deletePost);
 
 export default router;

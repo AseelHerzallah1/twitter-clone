@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { formatPostDate } from "../../utils/db/date/index";
+import { invalidateUnreadCounts } from "../../utils/unreadCounts";
 
 const ConversationView = ({ conversationId, onBack }) => {
 	const [text, setText] = useState("");
@@ -27,7 +28,7 @@ const ConversationView = ({ conversationId, onBack }) => {
 	const invalidateMessageQueries = () => {
 		queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
 		queryClient.invalidateQueries({ queryKey: ["conversations"] });
-		queryClient.invalidateQueries({ queryKey: ["dmUnreadCount"] });
+		invalidateUnreadCounts(queryClient);
 	};
 
 	const { mutate: send, isPending } = useMutation({
@@ -211,7 +212,8 @@ const MessagesPage = () => {
 			if (!res.ok) throw new Error(json.message);
 			return json.conversations || [];
 		},
-		refetchInterval: 10000,
+		refetchInterval: 10_000,
+		staleTime: 0,
 	});
 
 	const { mutate: deleteConversation } = useMutation({
@@ -223,7 +225,7 @@ const MessagesPage = () => {
 		},
 		onSuccess: (_, conversationId) => {
 			queryClient.invalidateQueries({ queryKey: ["conversations"] });
-			queryClient.invalidateQueries({ queryKey: ["dmUnreadCount"] });
+			invalidateUnreadCounts(queryClient);
 			if (activeId === conversationId) setActiveId(null);
 			setConfirmDeleteId(null);
 		},

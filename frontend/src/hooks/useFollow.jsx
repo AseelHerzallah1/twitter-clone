@@ -1,5 +1,6 @@
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateUnreadCounts } from "../utils/unreadCounts";
 
 const useFollow = () => {
     const queryClient = useQueryClient();
@@ -21,6 +22,7 @@ const useFollow = () => {
             queryClient.invalidateQueries({queryKey: ["suggestedUsers"]});
             queryClient.invalidateQueries({queryKey: ["notifications"]});
             queryClient.invalidateQueries({queryKey: ["userProfile"]});
+            invalidateUnreadCounts(queryClient);
         },
         onError: (error) => {
             toast.error(error.message || "Failed to follow user");

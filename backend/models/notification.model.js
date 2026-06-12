@@ -16,6 +16,15 @@ type: {
     required: true,
     enum: ['follow', 'like', 'comment', 'retweet', 'quote']
 },
+post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Post',
+    default: null,
+},
+commentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null,
+},
 read: {
     type: Boolean,
     default: false 

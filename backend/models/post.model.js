@@ -50,7 +50,19 @@ const postSchema = new mongoose.Schema({
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true
-        }
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now,
+        },
+        likes: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        }],
+        editedAt: {
+            type: Date,
+            default: null,
+        },
     }]
 }, { timestamps: true });
 

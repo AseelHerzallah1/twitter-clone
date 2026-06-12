@@ -1,4 +1,5 @@
-import { useParams } from "react-router-dom";
+import { useEffect } from "react";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import BackButton from "../../components/common/BackButton";
 import Post from "../../components/common/Post";
@@ -6,16 +7,34 @@ import LoadingSpinner from "../../components/common/LoadingSpinner";
 
 const PostDetailPage = () => {
 	const { id } = useParams();
+	const location = useLocation();
+	const navigate = useNavigate();
 
-	const { data: post, isLoading, error } = useQuery({
+	const { data, isLoading, error } = useQuery({
 		queryKey: ["post", id],
 		queryFn: async () => {
 			const res = await fetch(`/api/posts/${id}`);
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.message || "Post not found");
-			return data.post;
+			const json = await res.json();
+			if (!res.ok) throw new Error(json.message || "Post not found");
+			return json;
 		},
+		staleTime: 0,
 	});
+
+	const post = data?.post;
+
+	useEffect(() => {
+		if (!data?.redirect) return;
+		navigate(data.redirect, { replace: true, state: location.state });
+	}, [data?.redirect, navigate, location.state]);
+
+	useEffect(() => {
+		if (!post || !location.hash) return;
+		const target = document.querySelector(location.hash);
+		if (target) {
+			target.scrollIntoView({ behavior: "smooth", block: "center" });
+		}
+	}, [post, location.hash]);
 
 	return (
 		<div className='w-full min-h-screen'>

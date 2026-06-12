@@ -15,7 +15,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import LoadingSpinner from "./LoadingSpinner";
 import { formatPostDate } from "../../utils/db/date/index";
-import { updatePostInCache, removePostFromFeeds } from "../../utils/postCache";
+import { updatePostInCache, removePostFromFeeds, updatePostCommentsInCache, normalizeCommentsResponse } from "../../utils/postCache";
+import { invalidateUnreadCounts } from "../../utils/unreadCounts";
+import CommentItem from "./CommentItem";
 
 const ACTION_STYLES = {
 	reply: {
@@ -43,9 +45,9 @@ const PostAction = ({ count, active, type, onClick, onCountClick, loading, child
 			type='button'
 			onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
 			disabled={loading}
-			className='group flex items-center gap-1 min-w-[36px]'
+			className='group flex items-center gap-1 min-w-[36px] overflow-visible'
 		>
-			<span className={`flex items-center justify-center w-[34px] h-[34px] rounded-full transition-colors ${
+			<span className={`flex items-center justify-center w-[34px] h-[34px] rounded-full transition-colors overflow-visible p-0.5 ${
 				active ? styles.active : styles.idle
 			}`}>
 				{loading ? <LoadingSpinner size='sm' /> : children}
@@ -92,9 +94,17 @@ const Post = ({ post, variant = "feed" }) => {
 	const hasRetweeted = displayPost.retweetedByMe ?? false;
 	const retweetCount = displayPost.retweetCount ?? 0;
 	const isDetail = variant === "detail";
+	const comments = displayPost.comments || [];
+	const replyCount = displayPost.replyCount ?? comments.length ?? 0;
 
 	const goToPost = () => {
-		if (!isDetail) navigate(`/post/${postId}`);
+		if (!isDetail) navigate(`/post/${postId}`, { state: navigationState(location) });
+	};
+
+	const focusReplyForm = (username) => {
+		if (username) setComment(`@${username} `);
+		document.getElementById("reply-form")?.scrollIntoView({ behavior: "smooth" });
+		commentRef.current?.focus();
 	};
 
 	useEffect(() => {
@@ -151,25 +161,46 @@ const Post = ({ post, variant = "feed" }) => {
 		onError: (error) => toast.error(error.message),
 	});
 
-	const { mutate: likePost, isPending: isLiking } = useMutation({
+	const toggleLikesList = (likes = []) => {
+		if (!authUser?._id) return likes;
+		const idStr = authUser._id.toString();
+		const isCurrentlyLiked = likes.some((id) => id?.toString() === idStr);
+		return isCurrentlyLiked
+			? likes.filter((id) => id?.toString() !== idStr)
+			: [...likes, authUser._id];
+	};
+
+	const applyLikesToCache = (likes) => {
+		updatePostInCache(queryClient, postId, (p) => ({ ...p, likes }));
+		if (isRetweet) {
+			updatePostInCache(queryClient, post._id, (p) => ({
+				...p,
+				retweetOf: { ...p.retweetOf, likes },
+			}));
+		}
+	};
+
+	const { mutate: likePost } = useMutation({
 		mutationFn: async () => {
 			const res = await fetch(`/api/posts/like/${postId}`, { method: "POST" });
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Failed to like post");
 			return data;
 		},
-		onSuccess: (updatedLikes) => {
-			updatePostInCache(queryClient, postId, (p) => ({ ...p, likes: updatedLikes }));
-			if (isRetweet) {
-				updatePostInCache(queryClient, post._id, (p) => ({
-					...p,
-					retweetOf: { ...p.retweetOf, likes: updatedLikes },
-				}));
-			}
-			queryClient.invalidateQueries({ queryKey: ["notifications"] });
-			queryClient.invalidateQueries({ queryKey: ["notifications", "unreadCount"] });
+		onMutate: () => {
+			const prevLikes = displayPost.likes || [];
+			applyLikesToCache(toggleLikesList(prevLikes));
+			return { prevLikes };
 		},
-		onError: (error) => toast.error(error.message || "Failed to like post"),
+		onSuccess: (updatedLikes) => {
+			applyLikesToCache(updatedLikes);
+			queryClient.invalidateQueries({ queryKey: ["notifications"] });
+			invalidateUnreadCounts(queryClient);
+		},
+		onError: (error, _vars, context) => {
+			if (context?.prevLikes) applyLikesToCache(context.prevLikes);
+			toast.error(error.message || "Failed to like post");
+		},
 	});
 
 	const { mutate: bookmarkPost, isPending: isBookmarking } = useMutation({
@@ -209,48 +240,74 @@ const Post = ({ post, variant = "feed" }) => {
 			if (!res.ok) throw new Error(data.error || "Failed to post comment");
 			return data;
 		},
-		onSuccess: (updatedComments) => {
+		onSuccess: (data) => {
+			const updatedComments = normalizeCommentsResponse(data);
 			setComment("");
 			requestAnimationFrame(resizeComment);
-			updatePostInCache(queryClient, postId, (p) => ({ ...p, comments: updatedComments }));
+			updatePostCommentsInCache(queryClient, postId, updatedComments);
 			if (isRetweet) {
 				updatePostInCache(queryClient, post._id, (p) => ({
 					...p,
-					retweetOf: { ...p.retweetOf, comments: updatedComments },
+					retweetOf: {
+						...p.retweetOf,
+						comments: updatedComments,
+						replyCount: updatedComments.length,
+					},
 				}));
 			}
 			queryClient.invalidateQueries({ queryKey: ["notifications"] });
+			invalidateUnreadCounts(queryClient);
 		},
 		onError: (error) => toast.error(error.message || "Failed to post comment"),
 	});
 
-	const { mutate: retweetPost, isPending: isRetweeting } = useMutation({
+	const toggleRetweetState = ({ retweetCount: count = 0, retweetedByMe = false }) => {
+		const didRetweet = !retweetedByMe;
+		return {
+			retweetCount: Math.max(0, count + (didRetweet ? 1 : -1)),
+			retweetedByMe: didRetweet,
+		};
+	};
+
+	const applyRetweetToCache = ({ retweetCount: count, retweetedByMe: didRetweet }) => {
+		const updater = (p) => ({
+			...p,
+			retweetCount: count,
+			retweetedByMe: didRetweet,
+		});
+		updatePostInCache(queryClient, postId, updater);
+		if (isRetweet) {
+			updatePostInCache(queryClient, post._id, (p) => ({
+				...p,
+				retweetOf: { ...p.retweetOf, retweetCount: count, retweetedByMe: didRetweet },
+				retweetCount: count,
+				retweetedByMe: didRetweet,
+			}));
+		}
+	};
+
+	const { mutate: retweetPost } = useMutation({
 		mutationFn: async () => {
 			const res = await fetch(`/api/posts/retweet/${postId}`, { method: "POST" });
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Failed to retweet");
 			return data;
 		},
-		onSuccess: ({ retweetCount: count, retweetedByMe: didRetweet }) => {
-			const updater = (p) => ({
-				...p,
-				retweetCount: count,
-				retweetedByMe: didRetweet,
-			});
-			updatePostInCache(queryClient, postId, updater);
-			if (isRetweet) {
-				updatePostInCache(queryClient, post._id, (p) => ({
-					...p,
-					retweetOf: { ...p.retweetOf, retweetCount: count, retweetedByMe: didRetweet },
-					retweetCount: count,
-					retweetedByMe: didRetweet,
-				}));
-			}
-			queryClient.invalidateQueries({ queryKey: ["posts", "infinite"], refetchType: "active" });
-			queryClient.invalidateQueries({ queryKey: ["notifications", "unreadCount"], refetchType: "active" });
+		onMutate: () => {
+			const prev = { retweetCount, retweetedByMe: hasRetweeted };
+			applyRetweetToCache(toggleRetweetState(prev));
 			setRetweetMenuOpen(false);
+			return { prev };
 		},
-		onError: (error) => toast.error(error.message || "Failed to retweet"),
+		onSuccess: ({ retweetCount: count, retweetedByMe: didRetweet }) => {
+			applyRetweetToCache({ retweetCount: count, retweetedByMe: didRetweet });
+			queryClient.invalidateQueries({ queryKey: ["posts", "infinite"], refetchType: "active" });
+			invalidateUnreadCounts(queryClient);
+		},
+		onError: (error, _vars, context) => {
+			if (context?.prev) applyRetweetToCache(context.prev);
+			toast.error(error.message || "Failed to retweet");
+		},
 	});
 
 	const { mutate: pinPost } = useMutation({
@@ -366,17 +423,27 @@ const Post = ({ post, variant = "feed" }) => {
 				</div>
 			)}
 			<article
-				onClick={goToPost}
-				className={`flex gap-3 items-start px-4 py-3 border-b border-theme ${
-					!isDetail ? "hover-bg-theme transition-colors cursor-pointer" : ""
+				onClick={isDetail ? undefined : goToPost}
+				className={`flex gap-3 px-4 items-stretch ${
+					isDetail
+						? "pt-3"
+						: "py-3 border-b border-base-content/[0.08] hover-bg-theme transition-colors cursor-pointer"
 				}`}
 			>
-				<div className='avatar shrink-0' onClick={(e) => e.stopPropagation()}>
-					<Link to={`/profile/${postOwner.username}`} className='w-10 h-10 rounded-full overflow-hidden block'>
-						<img src={postOwner.profileImage || "/avatar-placeholder.svg"} alt='' />
-					</Link>
+				<div className='shrink-0 flex flex-col items-center w-10'>
+					<div className='avatar' onClick={(e) => e.stopPropagation()}>
+						<Link
+							to={`/profile/${postOwner.username}`}
+							className='rounded-full overflow-hidden block relative z-10 bg-base-100 w-10 h-10'
+						>
+							<img src={postOwner.profileImage || "/avatar-placeholder.svg"} alt='' />
+						</Link>
+					</div>
+					{isDetail && (
+						<div className='w-[2px] flex-1 min-h-[12px] bg-base-content/10 mt-1' aria-hidden='true' />
+					)}
 				</div>
-				<div className='flex flex-col flex-1 min-w-0'>
+				<div className={`flex flex-col flex-1 min-w-0 ${isDetail ? "pb-2" : ""}`}>
 					<div className='flex gap-1 items-center flex-wrap' onClick={(e) => e.stopPropagation()}>
 						<Link to={`/profile/${postOwner.username}`} className='font-bold text-[15px] hover:underline truncate'>
 							{postOwner.fullName}
@@ -466,9 +533,9 @@ const Post = ({ post, variant = "feed" }) => {
 						<p className='text-xs text-muted-theme mt-1'>Edited</p>
 					)}
 
-					<div className='flex items-center justify-between mt-3 w-full max-w-[425px]' onClick={(e) => e.stopPropagation()}>
+					<div className='flex items-center justify-between mt-3 w-full max-w-[425px] -ml-2' onClick={(e) => e.stopPropagation()}>
 						<PostAction
-							count={displayPost.comments?.length || 0}
+							count={replyCount}
 							active={false}
 							type='reply'
 							onClick={() => isDetail ? document.getElementById("reply-form")?.scrollIntoView({ behavior: "smooth" }) : navigate(`/post/${postId}`, { state: navigationState(location) })}
@@ -482,7 +549,6 @@ const Post = ({ post, variant = "feed" }) => {
 								active={hasRetweeted}
 								type='retweet'
 								onClick={() => setRetweetMenuOpen((open) => !open)}
-								loading={isRetweeting}
 							>
 								<RetweetIcon />
 							</PostAction>
@@ -492,7 +558,7 @@ const Post = ({ post, variant = "feed" }) => {
 										<button
 											type='button'
 											className='w-full px-4 py-3 text-left text-[15px] font-bold hover-bg-theme transition-colors'
-											onClick={() => !isRetweeting && retweetPost()}
+											onClick={() => retweetPost()}
 										>
 											Undo Retweet
 										</button>
@@ -500,7 +566,7 @@ const Post = ({ post, variant = "feed" }) => {
 										<button
 											type='button'
 											className='w-full px-4 py-3 text-left text-[15px] font-bold hover-bg-theme transition-colors'
-											onClick={() => !isRetweeting && retweetPost()}
+											onClick={() => retweetPost()}
 										>
 											Retweet
 										</button>
@@ -523,9 +589,8 @@ const Post = ({ post, variant = "feed" }) => {
 							count={displayPost.likes?.length || 0}
 							active={isLiked}
 							type='like'
-							onClick={() => !isLiking && likePost()}
+							onClick={() => likePost()}
 							onCountClick={displayPost.likes?.length > 0 ? () => setShowLikesModal(true) : undefined}
-							loading={isLiking}
 						>
 							<LikeIcon />
 						</PostAction>
@@ -541,71 +606,66 @@ const Post = ({ post, variant = "feed" }) => {
 						</PostAction>
 					</div>
 
-					{!isDetail && displayPost.comments?.length > 0 && (
+					{!isDetail && replyCount > 0 && (
 						<button
 							type='button'
 							className='text-twitter-reply text-sm mt-2 hover:underline text-left'
 							onClick={(e) => { e.stopPropagation(); navigate(`/post/${postId}`, { state: navigationState(location) }); }}
 						>
-							Show replies ({displayPost.comments.length})
+							{replyCount === 1 ? "Show reply" : `Show replies (${replyCount})`}
 						</button>
 					)}
 				</div>
 			</article>
 
 			{isDetail && (
-				<div className='border-b border-theme'>
-					{displayPost.comments?.length === 0 && (
-						<p className='px-4 py-6 text-center text-muted-theme text-sm'>No replies yet. Be the first!</p>
-					)}
-					<div className='ml-6 border-l-2 border-theme'>
-					{displayPost.comments?.map((c) => (
-						<div key={c._id} className='flex gap-3 px-4 py-3 border-b border-theme'>
-							<div className='avatar shrink-0'>
-								<Link to={`/profile/${c.user.username}`} className='w-10 h-10 rounded-full overflow-hidden block'>
-									<img src={c.user.profileImage || "/avatar-placeholder.svg"} alt='' />
-								</Link>
-							</div>
-							<div className='flex flex-col min-w-0'>
-								<div className='flex items-center gap-1 flex-wrap'>
-									<Link to={`/profile/${c.user.username}`} className='font-bold text-[15px] hover:underline'>
-										{c.user.fullName}
-									</Link>
-									<span className='text-muted-theme text-sm'>@{c.user.username}</span>
-								</div>
-								<PostText text={c.text} className='text-[15px] mt-0.5' />
-							</div>
-						</div>
+				<div className='thread-detail'>
+					{comments.map((comment, index) => (
+						<CommentItem
+							key={comment._id}
+							comment={comment}
+							postId={postId}
+							index={index}
+							total={comments.length}
+							authUser={authUser}
+							onReply={focusReplyForm}
+							hasRetweeted={hasRetweeted}
+							retweetCount={retweetCount}
+							onRetweet={() => retweetPost()}
+						/>
 					))}
-					</div>
 
 					<form
 						id='reply-form'
-						className='flex gap-3 px-4 py-3 items-start border-b border-theme'
+						className='flex gap-3 px-4 py-3 items-stretch border-t border-base-content/10 scroll-mt-24'
 						onSubmit={handlePostComment}
 					>
-						<div className='avatar shrink-0'>
-							<div className='w-10 rounded-full'>
-								<img src={authUser?.profileImage || "/avatar-placeholder.svg"} alt='' />
+						<div className='w-10 shrink-0 flex flex-col items-center'>
+							<div className='w-[2px] h-3 bg-base-content/10 shrink-0' aria-hidden='true' />
+							<div className='w-10 h-10 rounded-full overflow-hidden shrink-0 bg-base-100'>
+								<img src={authUser?.profileImage || "/avatar-placeholder.svg"} alt='' className='w-full h-full object-cover' />
 							</div>
 						</div>
-						<div className='flex-1 flex gap-2 items-end'>
+						<div className='flex-1 min-w-0 flex flex-col pt-1 pb-1'>
 							<textarea
 								ref={commentRef}
 								rows={1}
-								className='textarea flex-1 p-2 rounded-xl text-[15px] leading-5 resize-none overflow-hidden border border-theme bg-base-100 focus:outline-none focus:border-twitter-reply'
-								style={{ height: "40px" }}
+								className='w-full bg-transparent text-[20px] leading-7 resize-none overflow-hidden placeholder:text-muted-theme/50 focus:outline-none min-h-[32px]'
 								placeholder='Tweet your reply'
 								value={comment}
 								onChange={(e) => setComment(e.target.value)}
 							/>
-							<button
-								type='submit'
-								disabled={!comment.trim() || isCommenting}
-								className='btn btn-primary rounded-full btn-sm text-white px-4 font-bold disabled:opacity-50'
-							>
-								{isCommenting ? <LoadingSpinner size='sm' /> : "Reply"}
-							</button>
+							{comment.trim() && (
+								<div className='flex justify-end pt-3'>
+									<button
+										type='submit'
+										disabled={isCommenting}
+										className='bg-primary hover:bg-primary/90 text-white rounded-full px-4 py-1.5 text-[15px] font-bold disabled:opacity-50 transition-colors min-w-[68px] flex items-center justify-center'
+									>
+										{isCommenting ? <LoadingSpinner size='sm' /> : "Reply"}
+									</button>
+								</div>
+							)}
 						</div>
 					</form>
 				</div>

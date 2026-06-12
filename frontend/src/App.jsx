@@ -18,6 +18,7 @@ import ComposeModal from './components/common/ComposeModal';
 import SettingsModal from './components/common/SettingsModal';
 import { ThemeProvider } from './context/ThemeContext';
 import NestPanel from './components/nest/NestPanel';
+import UnreadCountsSync from './components/common/UnreadCountsSync';
 
 import {Toaster} from "react-hot-toast";
 import { useQuery } from '@tanstack/react-query';
@@ -62,6 +63,7 @@ if(isLoading){
 
   return (
     <>
+      <UnreadCountsSync />
       <div className='flex w-full min-h-screen'>
         <Sidebar />
         <div className='flex flex-1 min-w-0 flex-col'>

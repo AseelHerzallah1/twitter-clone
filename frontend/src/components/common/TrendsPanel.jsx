@@ -22,7 +22,7 @@ const TrendsPanel = () => {
 			<h2 className='font-bold text-xl px-4 py-3'>
 				{hasStarter ? "Topics to explore" : "Trends for you"}
 			</h2>
-			{trends.map((trend) => (
+			{trends.slice(0, 5).map((trend) => (
 				<Link
 					key={trend.tag}
 					to={`/search?q=${encodeURIComponent(trend.tag)}`}

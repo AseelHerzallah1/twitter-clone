@@ -109,6 +109,7 @@ const Posts = ({ feedType, username, userId }) => {
 		: Array.isArray(standardQuery.data)
 			? standardQuery.data
 			: [];
+	const displayItems = feedType === "media" ? items.filter((post) => post?.img?.trim()) : items;
 	const hasNextPage = isInfiniteFeed ? infiniteQuery.hasNextPage : false;
 	const isFetchingNextPage = isInfiniteFeed ? infiniteQuery.isFetchingNextPage : false;
 	const fetchNextPage = isInfiniteFeed ? infiniteQuery.fetchNextPage : () => {};
@@ -128,7 +129,7 @@ const Posts = ({ feedType, username, userId }) => {
 
 		observer.observe(el);
 		return () => observer.disconnect();
-	}, [isInfiniteFeed, hasNextPage, isFetchingNextPage, fetchNextPage, items.length]);
+	}, [isInfiniteFeed, hasNextPage, isFetchingNextPage, fetchNextPage, displayItems.length]);
 
 	return (
 		<>
@@ -142,7 +143,7 @@ const Posts = ({ feedType, username, userId }) => {
 			{!isLoading && isError && (
 				<p className='text-center my-8 px-4 text-red-500'>Could not load posts. Try refreshing.</p>
 			)}
-			{!isLoading && !isError && items.length === 0 && (
+			{!isLoading && !isError && displayItems.length === 0 && (
 				INFINITE_FEEDS.has(feedType) ? (
 					<FeedEmptyState feedType={feedType} />
 				) : (
@@ -151,9 +152,9 @@ const Posts = ({ feedType, username, userId }) => {
 					</p>
 				)
 			)}
-			{!isLoading && !isError && items.length > 0 && (
+			{!isLoading && !isError && displayItems.length > 0 && (
 				<div>
-					<PostsList feedType={feedType} items={items} />
+					<PostsList feedType={feedType} items={displayItems} />
 					{isInfiniteFeed && hasNextPage && (
 						<div ref={loadMoreRef} className='flex justify-center py-6'>
 							{isFetchingNextPage && <LoadingSpinner size='md' />}

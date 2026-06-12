@@ -1,7 +1,7 @@
-export const ReplyIcon = ({ className = "w-[18px] h-[18px]" }) => (
-	<svg viewBox='0 0 24 24' aria-hidden='true' className={className} fill='currentColor'>
-		<path d='M1.751 10c0-4.42 3.584-8.006 8.005-8.006h8.366c4.42 0 8.005 3.586 8.005 8.006 0 4.42-3.585 8.006-8.005 8.006h-2.132l-4.751 4.751V18c-4.421 0-8.005-3.586-8.005-8.006z' />
-	</svg>
+import { IoChatbubbleOutline } from "react-icons/io5";
+
+export const ReplyIcon = ({ className = "w-[19px] h-[19px]" }) => (
+	<IoChatbubbleOutline className={`shrink-0 ${className}`} aria-hidden='true' />
 );
 
 export const RetweetIcon = ({ className = "w-[18px] h-[18px]" }) => (

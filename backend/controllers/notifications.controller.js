@@ -1,13 +1,23 @@
 import Notification from "../models/notification.model.js";
+import { enrichNotifications } from "../lib/utils/enrichNotifications.js";
 
 export const getNotifications = async (req, res) => {
     try {
         const userId = req.user._id;
-        const notifications = await Notification.find({ to: userId }).populate({
-            "path": "from",
-            "select": "username profileImage fullName"
-        });
-        res.status(200).json(notifications);
+        const notifications = await Notification.find({ to: userId })
+            .populate({
+                path: "from",
+                select: "username profileImage fullName",
+            })
+            .populate({
+                path: "post",
+                select: "text img",
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const enriched = await enrichNotifications(notifications);
+        res.status(200).json(enriched);
 
     } catch (error) {
         console.log("Error fetching notifications:", error);
@@ -18,7 +28,10 @@ export const getNotifications = async (req, res) => {
 export const getUnreadCount = async (req, res) => {
     try {
         const userId = req.user._id;
-        const count = await Notification.countDocuments({ to: userId, read: false });
+        const count = await Notification.countDocuments({
+            to: userId,
+            read: { $ne: true },
+        });
         res.status(200).json({ count });
     } catch (error) {
         console.log("Error fetching unread count:", error);
@@ -29,7 +42,10 @@ export const getUnreadCount = async (req, res) => {
 export const markNotificationsRead = async (req, res) => {
     try {
         const userId = req.user._id;
-        await Notification.updateMany({ to: userId, read: false }, { read: true });
+        await Notification.updateMany(
+            { to: userId, read: { $ne: true } },
+            { $set: { read: true } }
+        );
         res.status(200).json({ message: "Notifications marked as read" });
     } catch (error) {
         console.log("Error marking notifications read:", error);

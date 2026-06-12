@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import Post from "../models/post.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import Notification from "../models/notification.model.js";
+import { restoreLegacyReplies, findEmbeddedComment } from "../lib/utils/restoreLegacyReplies.js";
 
 export const populatePostFields = (query) =>
     query
@@ -24,6 +25,21 @@ export const populatePostFields = (query) =>
 
 const toPlainPost = (post) => (post?.toObject ? post.toObject() : post);
 
+const excludeReplyPosts = {
+    $or: [{ replyTo: { $exists: false } }, { replyTo: null }],
+};
+
+const feedFilter = (extra = {}) => {
+    const { $or: cursorOr, ...rest } = extra;
+    if (!cursorOr) {
+        return { ...rest, ...excludeReplyPosts };
+    }
+    return {
+        ...rest,
+        $and: [excludeReplyPosts, { $or: cursorOr }],
+    };
+};
+
 const enrichPosts = async (posts, userId) => {
     if (!posts?.length) return [];
 
@@ -31,8 +47,9 @@ const enrichPosts = async (posts, userId) => {
     const originalIds = plainPosts
         .map((post) => (post.retweetOf?._id || post.retweetOf || post._id))
         .filter(Boolean);
+    const postIds = plainPosts.map((post) => post._id).filter(Boolean);
 
-    const [counts, mine] = await Promise.all([
+    const [counts, mine, orphanCounts] = await Promise.all([
         Post.aggregate([
             { $match: { retweetOf: { $in: originalIds } } },
             { $group: { _id: "$retweetOf", count: { $sum: 1 } } },
@@ -42,23 +59,41 @@ const enrichPosts = async (posts, userId) => {
                 .select("retweetOf")
                 .lean()
             : [],
+        postIds.length
+            ? Post.aggregate([
+                { $match: { replyTo: { $in: postIds } } },
+                { $group: { _id: "$replyTo", count: { $sum: 1 } } },
+            ])
+            : [],
     ]);
 
     const countMap = Object.fromEntries(counts.map((c) => [c._id.toString(), c.count]));
     const mineSet = new Set(mine.map((m) => m.retweetOf.toString()));
+    const orphanCountMap = Object.fromEntries(
+        orphanCounts.map((c) => [c._id.toString(), c.count])
+    );
 
     return plainPosts.map((post) => {
         const originalId = (post.retweetOf?._id || post.retweetOf || post._id).toString();
+        const embeddedReplies = post.comments?.length || 0;
+        const legacyReplies = orphanCountMap[post._id.toString()] || 0;
         const retweetMeta = {
             retweetCount: countMap[originalId] || 0,
             retweetedByMe: mineSet.has(originalId),
+            replyCount: embeddedReplies + legacyReplies,
         };
 
         if (post.retweetOf) {
             return {
                 ...post,
                 ...retweetMeta,
-                retweetOf: { ...post.retweetOf, ...retweetMeta },
+                retweetOf: {
+                    ...post.retweetOf,
+                    retweetCount: countMap[originalId] || 0,
+                    retweetedByMe: mineSet.has(originalId),
+                    replyCount: (post.retweetOf.comments?.length || 0) +
+                        (orphanCountMap[(post.retweetOf._id || post.retweetOf).toString()] || 0),
+                },
             };
         }
 
@@ -150,6 +185,7 @@ export const createPost = async (req, res) => {
                     from: userId,
                     to: quoted.user,
                     type: "quote",
+                    post: quotedPostId,
                 });
             }
         }
@@ -177,7 +213,13 @@ export const deletePost = async (req, res) => {
             const imgId = post.img.split("/").slice(-1)[0].split(".")[0];
             await cloudinary.uploader.destroy(imgId);
         }
-        await Post.deleteMany({ $or: [{ retweetOf: req.params.id }, { quotedPost: req.params.id }] });
+        await Post.deleteMany({
+            $or: [
+                { retweetOf: req.params.id },
+                { quotedPost: req.params.id },
+                { replyTo: req.params.id },
+            ],
+        });
         await Post.findByIdAndDelete(req.params.id);
         res.status(200).json({ message: "Post deleted successfully" });
 
@@ -191,10 +233,10 @@ export const commentOnPost = async (req, res) => {
     try {
         const { text } = req.body;
         const postId = req.params.id;
-        const userId = req.user._id.toString();
+        const userId = req.user._id;
 
-        if (!text) {
-            return res.status(400).json({ message: "Comment cannot be empty" });
+        if (!text?.trim()) {
+            return res.status(400).json({ message: "Reply cannot be empty" });
         }
 
         const post = await Post.findById(postId);
@@ -203,34 +245,159 @@ export const commentOnPost = async (req, res) => {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        const comment = {
-            user: userId,
-            text,
-        };
-
-        post.comments.push(comment);
+        post.comments.push({ user: userId, text: text.trim() });
         await post.save();
 
+        const savedComment = post.comments[post.comments.length - 1];
+
         if (userId.toString() !== post.user.toString()) {
-            const notification = new Notification({
+            await Notification.create({
                 from: userId,
                 to: post.user,
-                type: "comment"
+                type: "comment",
+                post: postId,
+                commentId: savedComment._id,
             });
-            await notification.save();
         }
 
-        const updatedPost = await Post.findById(postId).populate({
-            path: "comments.user",
-            select: "-password"
-        });
-
-        res.status(200).json(updatedPost.comments);
+        const updated = await populatePostFields(Post.findById(postId));
+        res.status(200).json(updated.comments);
     } catch (error) {
         console.log("Error in commentOnPost controller:", error);
         res.status(500).json({ message: "Internal server error" }); 
     }
 }
+
+export const likeUnlikeComment = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const { commentId } = req.params;
+        const userId = req.user._id;
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        const comment = post.comments.id(commentId);
+        if (!comment) {
+            return res.status(404).json({ message: "Comment not found" });
+        }
+
+        if (!comment.likes) {
+            comment.likes = [];
+        }
+
+        const userLiked = comment.likes.some((id) => id.toString() === userId.toString());
+        const commentAuthorId = comment.user;
+
+        if (userLiked) {
+            comment.likes.pull(userId);
+            await Notification.deleteOne({
+                from: userId,
+                to: commentAuthorId,
+                type: "like",
+                post: postId,
+                commentId,
+            });
+        } else {
+            comment.likes.push(userId);
+
+            if (userId.toString() !== commentAuthorId.toString()) {
+                await Notification.create({
+                    from: userId,
+                    to: commentAuthorId,
+                    type: "like",
+                    post: postId,
+                    commentId,
+                });
+            }
+        }
+
+        await post.save();
+
+        const updated = await Post.findById(postId).populate("comments.user", "-password");
+        res.status(200).json({ comments: updated.comments });
+    } catch (error) {
+        console.log("Error in likeUnlikeComment controller:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+
+export const editComment = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const { commentId } = req.params;
+        const { text } = req.body;
+        const userId = req.user._id;
+
+        if (!text?.trim()) {
+            return res.status(400).json({ message: "Reply cannot be empty" });
+        }
+        if (text.trim().length > 280) {
+            return res.status(400).json({ message: "Reply cannot exceed 280 characters" });
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        const comment = post.comments.id(commentId);
+        if (!comment) {
+            return res.status(404).json({ message: "Comment not found" });
+        }
+        if (comment.user.toString() !== userId.toString()) {
+            return res.status(403).json({ message: "You can only edit your own replies" });
+        }
+
+        comment.text = text.trim();
+        comment.editedAt = new Date();
+        await post.save();
+
+        const updated = await populatePostFields(Post.findById(postId));
+        res.status(200).json({ comments: updated.comments });
+    } catch (error) {
+        console.log("Error in editComment controller:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const deleteComment = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const { commentId } = req.params;
+        const userId = req.user._id;
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        const comment = post.comments.id(commentId);
+        if (!comment) {
+            return res.status(404).json({ message: "Comment not found" });
+        }
+        if (comment.user.toString() !== userId.toString()) {
+            return res.status(403).json({ message: "You can only delete your own replies" });
+        }
+
+        post.comments.pull(commentId);
+        await post.save();
+
+        await Notification.deleteMany({
+            post: postId,
+            commentId,
+        });
+
+        const updated = await populatePostFields(Post.findById(postId));
+        res.status(200).json({ comments: updated.comments });
+    } catch (error) {
+        console.log("Error in deleteComment controller:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
 
 
 export const likeUnlikePost = async (req, res) => {
@@ -250,7 +417,12 @@ export const likeUnlikePost = async (req, res) => {
             // Unlike the post
             await post.updateOne({ $pull: { likes: userId } });
             await User.updateOne({_id: post.user}, { $pull: { likedPosts: postId } });
-            await Notification.deleteOne({ from: userId, to: post.user, type: "like" });
+            await Notification.deleteOne({
+                from: userId,
+                to: post.user,
+                type: "like",
+                $or: [{ commentId: null }, { commentId: { $exists: false } }],
+            });
 
             const updatedLikes = post.likes.filter(id => id.toString() !== userId.toString());
 
@@ -265,7 +437,8 @@ export const likeUnlikePost = async (req, res) => {
                 const notification = new Notification({
                     from: userId,
                     to: post.user,
-                    type: "like"
+                    type: "like",
+                    post: postId,
                 });
                 await notification.save();
             }
@@ -282,15 +455,15 @@ export const getAllPosts = async (req, res) => {
     try {
         const { limit, cursor } = parsePagination(req);
 
-        let filter = {};
+        let filter = feedFilter();
         if (cursor) {
             const [cursorDate, cursorId] = cursor.split("_");
-            filter = {
+            filter = feedFilter({
                 $or: [
                     { createdAt: { $lt: new Date(cursorDate) } },
                     { createdAt: new Date(cursorDate), _id: { $lt: cursorId } },
                 ],
-            };
+            });
         }
 
         const posts = await populatePostFields(
@@ -339,16 +512,16 @@ export const getFollowingPosts = async (req, res) => {
         const following = user.following;
         const { limit, cursor } = parsePagination(req);
 
-        let filter = { user: { $in: following } };
+        let filter = feedFilter({ user: { $in: following } });
         if (cursor) {
             const [cursorDate, cursorId] = cursor.split("_");
-            filter = {
+            filter = feedFilter({
                 user: { $in: following },
                 $or: [
                     { createdAt: { $lt: new Date(cursorDate) } },
                     { createdAt: new Date(cursorDate), _id: { $lt: cursorId } },
                 ],
-            };
+            });
         }
 
         const followingPosts = await populatePostFields(
@@ -377,32 +550,63 @@ export const getUserReplies = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const posts = await Post.find({ "comments.user": user._id })
+        const postsWithReplies = await Post.find({ "comments.user": user._id })
             .populate({ path: "user", select: "-password" })
             .populate({ path: "comments.user", select: "-password" })
+            .sort({ updatedAt: -1 })
             .lean();
 
         const userReplies = [];
 
-        posts.forEach((post) => {
-            post.comments.forEach((comment) => {
-                const commentUserId = comment.user?._id?.toString() || comment.user?.toString();
-                if (commentUserId === user._id.toString()) {
-                    userReplies.push({
-                        _id: comment._id,
-                        text: comment.text,
-                        user: comment.user,
-                        parentPost: {
-                            _id: post._id,
-                            user: post.user,
-                            text: post.text,
-                        },
-                    });
-                }
-            });
-        });
+        for (const post of postsWithReplies) {
+            for (const comment of post.comments) {
+                const commentUserId = comment.user?._id || comment.user;
+                if (commentUserId?.toString() !== user._id.toString()) continue;
 
-        userReplies.sort((a, b) => b._id.toString().localeCompare(a._id.toString()));
+                userReplies.push({
+                    _id: comment._id,
+                    text: comment.text,
+                    user: comment.user,
+                    createdAt: comment.createdAt,
+                    parentPost: {
+                        _id: post._id,
+                        user: post.user,
+                        text: post.text,
+                    },
+                });
+            }
+        }
+
+        const orphanReplies = await Post.find({ user: user._id, replyTo: { $ne: null } })
+            .populate({ path: "user", select: "-password" })
+            .populate({
+                path: "replyTo",
+                select: "text user",
+                populate: { path: "user", select: "-password" },
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        for (const orphan of orphanReplies) {
+            const parent = orphan.replyTo;
+            if (!parent?._id) continue;
+
+            userReplies.push({
+                _id: orphan._id,
+                text: orphan.text,
+                user: orphan.user,
+                createdAt: orphan.createdAt,
+                parentPost: {
+                    _id: parent._id,
+                    user: parent.user,
+                    text: parent.text,
+                },
+            });
+
+            await restoreLegacyReplies(parent._id);
+        }
+
+        userReplies.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         res.status(200).json({ userReplies });
     } catch (error) {
@@ -422,7 +626,7 @@ export const getUserPosts = async (req, res) => {
         }
 
         const userPosts = await populatePostFields(
-            Post.find({ user: user._id }).sort({ createdAt: -1 })
+            Post.find(feedFilter({ user: user._id })).sort({ createdAt: -1 })
         );
 
         const pinnedId = user.pinnedPost?.toString();
@@ -458,11 +662,14 @@ export const getUserMedia = async (req, res) => {
             Post.find({
                 user: user._id,
                 retweetOf: null,
-                img: { $exists: true, $ne: "" },
+                ...excludeReplyPosts,
+                img: { $exists: true, $nin: ["", null] },
             }).sort({ createdAt: -1 })
         ).lean();
 
-        res.status(200).json({ mediaPosts });
+        const withImages = mediaPosts.filter((post) => post.img?.trim());
+
+        res.status(200).json({ mediaPosts: withImages });
     } catch (error) {
         console.log("Error in getUserMedia controller:", error);
         res.status(500).json({ message: "Internal server error" });
@@ -471,13 +678,31 @@ export const getUserMedia = async (req, res) => {
 
 export const getPostById = async (req, res) => {
     try {
-        const post = await populatePostFields(Post.findById(req.params.id));
+        const postDoc = await Post.findById(req.params.id).lean();
 
-        if (!post) {
+        if (!postDoc) {
             return res.status(404).json({ message: "Post not found" });
         }
 
+        // Legacy reply posts from an old migration — restore into parent thread.
+        if (postDoc.replyTo) {
+            await restoreLegacyReplies(postDoc.replyTo);
+
+            const parent = await Post.findById(postDoc.replyTo).lean();
+            const match = findEmbeddedComment(parent, postDoc);
+
+            const redirect = match?._id
+                ? `/post/${postDoc.replyTo}#comment-${match._id}`
+                : `/post/${postDoc.replyTo}`;
+
+            return res.status(200).json({ redirect, post: null });
+        }
+
+        await restoreLegacyReplies(req.params.id);
+
+        const post = await populatePostFields(Post.findById(req.params.id));
         const [enriched] = await enrichPosts([post], req.user._id);
+
         res.status(200).json({ post: enriched });
     } catch (error) {
         console.log("Error in getPostById controller:", error);
@@ -613,6 +838,7 @@ export const retweetPost = async (req, res) => {
                 from: userId,
                 to: original.user,
                 type: "retweet",
+                post: originalId,
             });
         }
 
