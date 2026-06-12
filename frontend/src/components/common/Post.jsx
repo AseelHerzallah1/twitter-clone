@@ -15,7 +15,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import LoadingSpinner from "./LoadingSpinner";
 import { formatPostDate } from "../../utils/db/date/index";
-import { updatePostInCache, removePostFromFeeds, updatePostCommentsInCache, normalizeCommentsResponse } from "../../utils/postCache";
+import { updatePostInCache, removePostFromFeeds, updatePostCommentsInCache, normalizeCommentsResponse, removePostFromLikesFeed } from "../../utils/postCache";
 import { invalidateUnreadCounts } from "../../utils/unreadCounts";
 import CommentItem from "./CommentItem";
 
@@ -189,8 +189,11 @@ const Post = ({ post, variant = "feed" }) => {
 		},
 		onMutate: () => {
 			const prevLikes = displayPost.likes || [];
+			const idStr = authUser?._id?.toString();
+			const wasLiked = idStr && prevLikes.some((id) => id?.toString() === idStr);
 			applyLikesToCache(toggleLikesList(prevLikes));
-			return { prevLikes };
+			if (wasLiked) removePostFromLikesFeed(queryClient, postId);
+			return { prevLikes, wasLiked };
 		},
 		onSuccess: (updatedLikes) => {
 			applyLikesToCache(updatedLikes);
@@ -199,6 +202,9 @@ const Post = ({ post, variant = "feed" }) => {
 		},
 		onError: (error, _vars, context) => {
 			if (context?.prevLikes) applyLikesToCache(context.prevLikes);
+			if (context?.wasLiked) {
+				queryClient.invalidateQueries({ queryKey: ["posts", "likes"] });
+			}
 			toast.error(error.message || "Failed to like post");
 		},
 	});

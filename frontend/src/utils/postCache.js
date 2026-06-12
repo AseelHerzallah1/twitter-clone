@@ -81,6 +81,15 @@ export const removePostFromFeeds = (queryClient, postId) => {
 	queryClient.removeQueries({ queryKey: ["post", postId] });
 };
 
+/** Remove a post from profile Likes tab after unliking. */
+export const removePostFromLikesFeed = (queryClient, postId) => {
+	const targetId = normalizeId(postId);
+	queryClient.setQueriesData({ queryKey: ["posts", "likes"] }, (old) => {
+		if (!Array.isArray(old)) return old;
+		return old.filter((p) => normalizeId(p._id) !== targetId);
+	});
+};
+
 /** API returns comments as a raw array or `{ comments }` depending on endpoint. */
 export const normalizeCommentsResponse = (data) => {
 	if (Array.isArray(data)) return data;

@@ -416,7 +416,7 @@ export const likeUnlikePost = async (req, res) => {
         if (userLikedPost) {
             // Unlike the post
             await post.updateOne({ $pull: { likes: userId } });
-            await User.updateOne({_id: post.user}, { $pull: { likedPosts: postId } });
+            await User.updateOne({ _id: userId }, { $pull: { likedPosts: postId } });
             await Notification.deleteOne({
                 from: userId,
                 to: post.user,
@@ -430,7 +430,7 @@ export const likeUnlikePost = async (req, res) => {
         } else {
             // Like the post
             post.likes.push(userId);
-            await User.updateOne({_id: post.user}, { $push: { likedPosts: postId } });
+            await User.updateOne({ _id: userId }, { $push: { likedPosts: postId } });
             await post.save();
 
             if (userId.toString() !== post.user.toString()) {
@@ -490,7 +490,18 @@ export const getLikedPosts = async (req, res) => {
 
         if(!user) return res.status(404).json({ message: "User not found" });
 
-        const likedPosts = await populatePostFields(Post.find({ _id: { $in: user.likedPosts } }));
+        const likedPosts = await populatePostFields(
+            Post.find({ likes: userId }).sort({ createdAt: -1 })
+        );
+        const likedPostIds = likedPosts.map((p) => p._id);
+
+        // Keep user.likedPosts in sync with post.likes (repairs legacy drift)
+        const storedIds = user.likedPosts.map((id) => id.toString()).sort().join(",");
+        const actualIds = likedPostIds.map((id) => id.toString()).sort().join(",");
+        if (storedIds !== actualIds) {
+            await User.updateOne({ _id: userId }, { $set: { likedPosts: likedPostIds } });
+        }
+
         const enriched = await enrichPosts(likedPosts, req.user?._id);
 
         res.status(200).json({ likedPosts: enriched });
