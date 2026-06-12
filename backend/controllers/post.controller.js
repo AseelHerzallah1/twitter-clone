@@ -697,7 +697,11 @@ export const getPostById = async (req, res) => {
 
         // Legacy reply posts from an old migration — restore into parent thread.
         if (postDoc.replyTo) {
-            await restoreLegacyReplies(postDoc.replyTo);
+            try {
+                await restoreLegacyReplies(postDoc.replyTo);
+            } catch (restoreError) {
+                console.log("restoreLegacyReplies failed:", restoreError);
+            }
 
             const parent = await Post.findById(postDoc.replyTo).lean();
             const match = findEmbeddedComment(parent, postDoc);
@@ -709,7 +713,11 @@ export const getPostById = async (req, res) => {
             return res.status(200).json({ redirect, post: null });
         }
 
-        await restoreLegacyReplies(req.params.id);
+        try {
+            await restoreLegacyReplies(req.params.id);
+        } catch (restoreError) {
+            console.log("restoreLegacyReplies failed:", restoreError);
+        }
 
         const post = await populatePostFields(Post.findById(req.params.id));
         const [enriched] = await enrichPosts([post], req.user._id);

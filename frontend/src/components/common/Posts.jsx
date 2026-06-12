@@ -92,6 +92,8 @@ const Posts = ({ feedType, username, userId }) => {
 		getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
 		enabled: isInfiniteFeed,
 		staleTime: 2 * 60 * 1000,
+		retry: 1,
+		refetchOnWindowFocus: true,
 		placeholderData: (previousData) => previousData,
 	});
 

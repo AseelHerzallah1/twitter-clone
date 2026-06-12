@@ -1,16 +1,22 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import BackButton from "../../components/common/BackButton";
 import Post from "../../components/common/Post";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import { navigationState } from "../../utils/navigation";
 
 const PostDetailPage = () => {
 	const { id } = useParams();
 	const location = useLocation();
 	const navigate = useNavigate();
+	const redirectHandled = useRef(null);
 
-	const { data, isLoading, error } = useQuery({
+	useEffect(() => {
+		redirectHandled.current = null;
+	}, [id]);
+
+	const { data, isLoading, isFetching, error } = useQuery({
 		queryKey: ["post", id],
 		queryFn: async () => {
 			const res = await fetch(`/api/posts/${id}`);
@@ -19,14 +25,32 @@ const PostDetailPage = () => {
 			return json;
 		},
 		staleTime: 0,
+		retry: 1,
 	});
 
 	const post = data?.post;
+	const pendingRedirect = Boolean(data?.redirect && !post);
 
 	useEffect(() => {
-		if (!data?.redirect) return;
-		navigate(data.redirect, { replace: true, state: location.state });
-	}, [data?.redirect, navigate, location.state]);
+		if (!data?.redirect || redirectHandled.current === id) return;
+
+		const [redirectPath, redirectHash = ""] = data.redirect.split("#");
+		const targetHash = redirectHash ? `#${redirectHash}` : "";
+		const alreadyThere =
+			location.pathname === redirectPath &&
+			(location.hash || "") === targetHash;
+
+		if (alreadyThere) {
+			redirectHandled.current = id;
+			return;
+		}
+
+		redirectHandled.current = id;
+		navigate(data.redirect, {
+			replace: true,
+			state: navigationState(location),
+		});
+	}, [data?.redirect, id, navigate, location.pathname, location.hash, location.state]);
 
 	useEffect(() => {
 		if (!post || !location.hash) return;
@@ -36,6 +60,8 @@ const PostDetailPage = () => {
 		}
 	}, [post, location.hash]);
 
+	const showLoading = isLoading || (isFetching && !post) || pendingRedirect;
+
 	return (
 		<div className='w-full min-h-screen'>
 			<div className='sticky-page-header bg-base-100/80 backdrop-blur-md flex items-center gap-6 px-4 py-2 border-b border-theme'>
@@ -43,13 +69,15 @@ const PostDetailPage = () => {
 				<h1 className='text-xl font-bold'>Tweet</h1>
 			</div>
 
-			{isLoading && (
+			{showLoading && (
 				<div className='flex justify-center py-16'>
 					<LoadingSpinner size='lg' />
 				</div>
 			)}
-			{error && <p className='text-center py-8 text-muted-theme'>Post not found</p>}
-			{post && <Post post={post} variant='detail' />}
+			{error && !showLoading && (
+				<p className='text-center py-8 text-muted-theme'>Post not found</p>
+			)}
+			{post && !pendingRedirect && <Post post={post} variant='detail' />}
 		</div>
 	);
 };
